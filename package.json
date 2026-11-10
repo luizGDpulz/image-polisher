@@ -1,0 +1,19 @@
+{
+  "name": "image-polisher",
+  "type": "module",
+  "version": "1.0.0",
+  "license": "MIT",
+  "description": "Ultra-lightweight client-side image & screenshot polisher with smart drop-shadow, clipboard workflow and multi-format compression",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.4.2",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2"
+  }
+}
