@@ -14,7 +14,7 @@ RUN pnpm run build
 # Stage 2: Hardened Non-Root Nginx Runtime
 FROM nginx:alpine AS runtime
 
-RUN sed -i 's,/var/run/nginx.pid,/tmp/nginx.pid,' /etc/nginx/nginx.conf \
+RUN sed -i 's,^\(pid\s*\).*,\1/tmp/nginx.pid;,' /etc/nginx/nginx.conf \
     && sed -i '/^user /d' /etc/nginx/nginx.conf \
     && rm -f /etc/nginx/conf.d/default.conf \
     && chown -R nginx:nginx /var/cache/nginx /var/log/nginx /etc/nginx/conf.d
