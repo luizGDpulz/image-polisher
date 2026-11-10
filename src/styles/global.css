@@ -1,0 +1,202 @@
+@import "tailwindcss";
+
+:root {
+  /* Raw light & dark brand tokens */
+  --brand-light: #7c3aed;
+  --brand-dark: #a78bfa;
+  --brand-hover-light: #6d28d9;
+  --brand-hover-dark: #c4b5fd;
+
+  --surface-app-light: #f3f4f6;
+  --surface-app-dark: #0b0f19;
+  --surface-panel-light: #ffffff;
+  --surface-panel-dark: #111827;
+  --surface-subtle-light: #f9fafb;
+  --surface-subtle-dark: #1f2937;
+
+  --text-main-light: #111827;
+  --text-main-dark: #f9fafb;
+  --text-muted-light: #4b5563;
+  --text-muted-dark: #9ca3af;
+
+  --border-light: #e5e7eb;
+  --border-dark: #1f2937;
+  --border-strong-light: #9ca3af;
+  --border-strong-dark: #4b5563;
+
+  --scrollbar-track-light: #f3f4f6;
+  --scrollbar-track-dark: #111827;
+  --scrollbar-thumb-light: #6b7280;
+  --scrollbar-thumb-dark: #6b7280;
+
+  /* Default fallback tokens before light-dark() */
+  --color-brand: var(--brand-light);
+  --color-brand-hover: var(--brand-hover-light);
+  --bg-app: var(--surface-app-light);
+  --bg-panel: var(--surface-panel-light);
+  --bg-subtle: var(--surface-subtle-light);
+  --text-main: var(--text-main-light);
+  --text-muted: var(--text-muted-light);
+  --border-color: var(--border-light);
+  --border-strong: var(--border-strong-light);
+  --scrollbar-track: var(--scrollbar-track-light);
+  --scrollbar-thumb: var(--scrollbar-thumb-light);
+
+  /* Fallback for browsers without light-dark() support */
+  @media (prefers-color-scheme: dark) {
+    --color-brand: var(--brand-dark);
+    --color-brand-hover: var(--brand-hover-dark);
+    --bg-app: var(--surface-app-dark);
+    --bg-panel: var(--surface-panel-dark);
+    --bg-subtle: var(--surface-subtle-dark);
+    --text-main: var(--text-main-dark);
+    --text-muted: var(--text-muted-dark);
+    --border-color: var(--border-dark);
+    --border-strong: var(--border-strong-dark);
+    --scrollbar-track: var(--scrollbar-track-dark);
+    --scrollbar-thumb: var(--scrollbar-thumb-dark);
+  }
+
+  /* Modern CSS light-dark() automatic resolution */
+  @supports (color: light-dark(white, black)) {
+    --color-brand: light-dark(var(--brand-light), var(--brand-dark));
+    --color-brand-hover: light-dark(var(--brand-hover-light), var(--brand-hover-dark));
+    --bg-app: light-dark(var(--surface-app-light), var(--surface-app-dark));
+    --bg-panel: light-dark(var(--surface-panel-light), var(--surface-panel-dark));
+    --bg-subtle: light-dark(var(--surface-subtle-light), var(--surface-subtle-dark));
+    --text-main: light-dark(var(--text-main-light), var(--text-main-dark));
+    --text-muted: light-dark(var(--text-muted-light), var(--text-muted-dark));
+    --border-color: light-dark(var(--border-light), var(--border-dark));
+    --border-strong: light-dark(var(--border-strong-light), var(--border-strong-dark));
+    --scrollbar-track: light-dark(var(--scrollbar-track-light), var(--scrollbar-track-dark));
+    --scrollbar-thumb: light-dark(var(--scrollbar-thumb-light), var(--scrollbar-thumb-dark));
+  }
+
+  /* Viewport-wide native UI theming + <meta name="color-scheme"> override reflection */
+  color-scheme: light dark;
+
+  &:has(> head > meta[name="color-scheme"][content="dark"]) {
+    color-scheme: dark;
+  }
+
+  &:has(> head > meta[name="color-scheme"][content="light"]) {
+    color-scheme: light;
+  }
+
+  accent-color: var(--color-brand);
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+}
+
+/* Fallback for older browsers without accent-color support */
+@supports not (accent-color: var(--color-brand)) {
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 8px;
+    background: linear-gradient(to right, var(--color-brand) var(--progress, 50%), #9ca3af var(--progress, 50%));
+    border-radius: 4px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: var(--color-brand);
+    cursor: pointer;
+    margin-top: -4px;
+  }
+  input[type="range"]::-moz-range-track {
+    width: 100%;
+    height: 8px;
+    background: #9ca3af;
+    border-radius: 4px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: var(--color-brand);
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-progress {
+    background-color: var(--color-brand);
+    height: 8px;
+    border-radius: 4px;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  accent-color: var(--color-brand);
+}
+
+.visually-hidden {
+  position: absolute !important;
+  clip-path: inset(50%) !important;
+  overflow: hidden !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  white-space: nowrap !important;
+}
+
+/* Accessible focus outlines */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+label:focus-within {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* Stage background patterns for previewing shadow contrast */
+.stage-checkerboard {
+  background: repeating-conic-gradient(#e5e7eb 0% 25%, #ffffff 0% 50%) 50% / 24px 24px;
+}
+
+:root:has(> head > meta[name="color-scheme"][content="dark"]) .stage-checkerboard {
+  background: repeating-conic-gradient(#1f2937 0% 25%, #111827 0% 50%) 50% / 24px 24px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(:has(> head > meta[name="color-scheme"][content="light"])) .stage-checkerboard {
+    background: repeating-conic-gradient(#1f2937 0% 25%, #111827 0% 50%) 50% / 24px 24px;
+  }
+}
+
+.stage-light {
+  background: #ffffff;
+}
+
+.stage-dark {
+  background: #0f172a;
+}
