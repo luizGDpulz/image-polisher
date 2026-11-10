@@ -7,14 +7,30 @@ export interface RenderDimensions {
   padY: number;
 }
 
+function clampFinite(value: number, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
+}
+
+export function sanitizeShadowConfig(config: ShadowConfig): ShadowConfig {
+  return {
+    offsetX: clampFinite(config.offsetX, -200, 200, 0),
+    offsetY: clampFinite(config.offsetY, -200, 200, 0),
+    blur: clampFinite(config.blur, 0, 200, 20),
+    opacity: clampFinite(config.opacity, 0, 1, 0.35),
+    extraPadding: clampFinite(config.extraPadding, 0, 300, 0),
+  };
+}
+
 /**
  * Calcula a margem (padding) automática por lado para garantir que o raio
  * gaussiano do blur (aprox. 2x blur) somado ao deslocamento (offsetX/offsetY)
  * nunca seja cortado na borda do canvas.
  */
-export function calculateSmartPadding(config: ShadowConfig): { padX: number; padY: number } {
-  const blurRadius = Math.max(0, config.blur) * 2;
-  const extra = Math.max(0, config.extraPadding);
+export function calculateSmartPadding(rawConfig: ShadowConfig): { padX: number; padY: number } {
+  const config = sanitizeShadowConfig(rawConfig);
+  const blurRadius = config.blur * 2;
+  const extra = config.extraPadding;
 
   const hasVisibleShadow =
     config.opacity > 0 && (config.blur > 0 || config.offsetX !== 0 || config.offsetY !== 0);
@@ -35,9 +51,10 @@ export function calculateSmartPadding(config: ShadowConfig): { padX: number; pad
 export function renderShadowCanvas(
   canvas: HTMLCanvasElement,
   image: HTMLImageElement,
-  config: ShadowConfig,
+  rawConfig: ShadowConfig,
   options?: { fillBackground?: string }
 ): RenderDimensions {
+  const config = sanitizeShadowConfig(rawConfig);
   const { padX, padY } = calculateSmartPadding(config);
   const width = image.naturalWidth + padX * 2;
   const height = image.naturalHeight + padY * 2;
@@ -58,9 +75,8 @@ export function renderShadowCanvas(
     ctx.fillRect(0, 0, width, height);
   }
 
-  const clampedOpacity = Math.min(1, Math.max(0, config.opacity));
-  ctx.shadowColor = `rgba(0, 0, 0, ${clampedOpacity})`;
-  ctx.shadowBlur = Math.max(0, config.blur);
+  ctx.shadowColor = `rgba(0, 0, 0, ${config.opacity})`;
+  ctx.shadowBlur = config.blur;
   ctx.shadowOffsetX = config.offsetX;
   ctx.shadowOffsetY = config.offsetY;
 
