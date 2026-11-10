@@ -1,0 +1,15 @@
+services:
+  image-polisher:
+    image: ghcr.io/luizgdpulz/image-polisher:latest
+    container_name: image-polisher
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    expose:
+      - "8080"
+    networks:
+      - proxy-net
+
+networks:
+  proxy-net:
+    external: true
