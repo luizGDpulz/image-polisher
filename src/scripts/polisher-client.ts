@@ -67,7 +67,7 @@ function createSampleScreenshotFile(): Promise<File> {
     // Título simulado
     sCtx.fillStyle = '#374151';
     sCtx.font = '600 13px Inter, system-ui, sans-serif';
-    sCtx.fillText('Secullum Ponto Web — Comprovante de Ajuste (PF)', 90, 27);
+    sCtx.fillText('Image Polisher — Print de Exemplo', 90, 27);
 
     // Conteúdo simulado de sistema
     sCtx.fillStyle = '#7c3aed';
@@ -116,7 +116,7 @@ function createSampleScreenshotFile(): Promise<File> {
         reject(new Error('Falha ao criar imagem de exemplo'));
         return;
       }
-      resolve(new File([blob], 'pf-secullum-exemplo.png', { type: 'image/png' }));
+      resolve(new File([blob], 'print-exemplo.png', { type: 'image/png' }));
     }, 'image/png');
   });
 }
@@ -125,7 +125,14 @@ export function initImagePolisher(): void {
   const canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
   const emptyState = document.getElementById('empty-state');
   const canvasContainer = document.getElementById('canvas-container');
+  const canvasTransform = document.getElementById('canvas-transform');
   const stageWrapper = document.getElementById('stage-wrapper');
+  const zoomToolbar = document.getElementById('zoom-toolbar');
+  const btnZoomOut = document.getElementById('btn-zoom-out') as HTMLButtonElement | null;
+  const btnZoom100 = document.getElementById('btn-zoom-100') as HTMLButtonElement | null;
+  const btnZoomIn = document.getElementById('btn-zoom-in') as HTMLButtonElement | null;
+  const btnZoomFit = document.getElementById('btn-zoom-fit') as HTMLButtonElement | null;
+
   const uploadInput = document.getElementById('upload') as HTMLInputElement | null;
   const dropzoneLabel = document.getElementById('dropzone-label');
   const fileNameBadge = document.getElementById('file-name-badge');
@@ -151,6 +158,61 @@ export function initImagePolisher(): void {
   let uploadedBaseName = 'imagem-editada';
   let originalBytes = 0;
   let estimateTimer: number | null = null;
+
+  // Estado de Zoom, Pan e Auto-Fit dentro do palco físico fixo
+  const MIN_ZOOM = 0.1;
+  const MAX_ZOOM = 5.0;
+  let zoomMode: 'fit' | 'manual' = 'fit';
+  let zoomScale = 1;
+  let panX = 0;
+  let panY = 0;
+
+  function computeFitScale(): number {
+    if (!stageWrapper || !canvas || canvas.width === 0 || canvas.height === 0) {
+      return 1;
+    }
+    const rect = stageWrapper.getBoundingClientRect();
+    // Reserva respiro interno para as barras flutuantes superior e inferior
+    const availW = Math.max(120, rect.width - 64);
+    const availH = Math.max(120, rect.height - 104);
+    const fitRatio = Math.min(availW / canvas.width, availH / canvas.height, 1);
+    return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, fitRatio));
+  }
+
+  function applyViewportTransform(): void {
+    if (canvasTransform) {
+      canvasTransform.style.transform = `translate3d(${Math.round(panX)}px, ${Math.round(panY)}px, 0) scale(${zoomScale})`;
+    }
+    if (btnZoom100) {
+      btnZoom100.textContent = `${Math.round(zoomScale * 100)}%`;
+    }
+    if (btnZoomFit) {
+      btnZoomFit.setAttribute('aria-pressed', zoomMode === 'fit' ? 'true' : 'false');
+    }
+  }
+
+  function fitCanvasToStage(): void {
+    zoomMode = 'fit';
+    panX = 0;
+    panY = 0;
+    zoomScale = computeFitScale();
+    applyViewportTransform();
+  }
+
+  function setManualZoom(nextScale: number, focalClientX?: number, focalClientY?: number): void {
+    const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextScale));
+    if (focalClientX !== undefined && focalClientY !== undefined && stageWrapper) {
+      const rect = stageWrapper.getBoundingClientRect();
+      const cursorX = focalClientX - (rect.left + rect.width / 2);
+      const cursorY = focalClientY - (rect.top + rect.height / 2);
+      const ratio = clamped / zoomScale;
+      panX = cursorX - (cursorX - panX) * ratio;
+      panY = cursorY - (cursorY - panY) * ratio;
+    }
+    zoomMode = 'manual';
+    zoomScale = clamped;
+    applyViewportTransform();
+  }
 
   const shadowState: ShadowConfig = { ...SHADOW_PRESETS.medio };
   const exportState: ExportConfig = {
@@ -236,6 +298,14 @@ export function initImagePolisher(): void {
 
     const dims = renderShadowCanvas(canvas, currentImage, shadowState);
 
+    // Se estiver em modo Auto-Ajustar, recalcula automaticamente a escala para caber no palco fixo
+    if (zoomMode === 'fit') {
+      zoomScale = computeFitScale();
+      panX = 0;
+      panY = 0;
+    }
+    applyViewportTransform();
+
     if (dimensionsBadge) {
       dimensionsBadge.textContent = `${ currentImage.naturalWidth }×${ currentImage.naturalHeight } → ${ dims.width }×${ dims.height } px`;
       dimensionsBadge.classList.remove('hidden');
@@ -272,6 +342,7 @@ export function initImagePolisher(): void {
 
       if (emptyState) emptyState.classList.add('hidden');
       if (canvasContainer) canvasContainer.classList.remove('hidden');
+      if (zoomToolbar) zoomToolbar.classList.remove('hidden');
 
       if (fileNameBadge) {
         fileNameBadge.textContent = `${result.baseName} (${formatByteSize(result.originalBytes)})`;
@@ -280,6 +351,10 @@ export function initImagePolisher(): void {
       if (btnCopy) btnCopy.disabled = false;
       if (btnDownload) btnDownload.disabled = false;
 
+      // Ao carregar nova imagem, ativa o modo Auto-Ajustar centralizado
+      zoomMode = 'fit';
+      panX = 0;
+      panY = 0;
       renderCurrent();
       if (sourceLabel) {
         showToast(sourceLabel);
@@ -288,6 +363,103 @@ export function initImagePolisher(): void {
       showToast(err instanceof Error ? err.message : 'Erro ao abrir imagem');
     }
   }
+
+  // Observa redimensionamento do palco físico para auto-redimensionar a imagem quando em modo fit
+  if (stageWrapper && typeof ResizeObserver !== 'undefined') {
+    const ro = new ResizeObserver(() => {
+      if (currentImage && zoomMode === 'fit') {
+        zoomScale = computeFitScale();
+        panX = 0;
+        panY = 0;
+        applyViewportTransform();
+      }
+    });
+    ro.observe(stageWrapper);
+  }
+
+  // Zoom com a roda do mouse focalizado na posição do cursor
+  canvasContainer?.addEventListener(
+    'wheel',
+    (e) => {
+      if (!currentImage) return;
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+      setManualZoom(zoomScale * factor, e.clientX, e.clientY);
+    },
+    { passive: false }
+  );
+
+  // Pan (Arrastar imagem dentro do palco fixo) via Pointer Events
+  let isPanning = false;
+  let startPointerX = 0;
+  let startPointerY = 0;
+  let startPanX = 0;
+  let startPanY = 0;
+
+  canvasContainer?.addEventListener('pointerdown', (e) => {
+    if (!currentImage || e.button !== 0) return;
+    isPanning = true;
+    startPointerX = e.clientX;
+    startPointerY = e.clientY;
+    startPanX = panX;
+    startPanY = panY;
+    canvasContainer.setPointerCapture(e.pointerId);
+  });
+
+  canvasContainer?.addEventListener('pointermove', (e) => {
+    if (!isPanning) return;
+    const dx = e.clientX - startPointerX;
+    const dy = e.clientY - startPointerY;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+      zoomMode = 'manual';
+    }
+    panX = startPanX + dx;
+    panY = startPanY + dy;
+    applyViewportTransform();
+  });
+
+  const endPan = (e: PointerEvent) => {
+    if (!isPanning) return;
+    isPanning = false;
+    if (canvasContainer?.hasPointerCapture(e.pointerId)) {
+      canvasContainer.releasePointerCapture(e.pointerId);
+    }
+  };
+
+  canvasContainer?.addEventListener('pointerup', endPan);
+  canvasContainer?.addEventListener('pointercancel', endPan);
+
+  // Duplo clique no palco restaura o Auto-Ajuste
+  canvasContainer?.addEventListener('dblclick', () => {
+    if (!currentImage) return;
+    fitCanvasToStage();
+    showToast('Imagem ajustada automaticamente ao palco');
+  });
+
+  // Botões da barra flutuante de Zoom
+  btnZoomIn?.addEventListener('click', () => {
+    if (!currentImage) return;
+    setManualZoom(zoomScale * 1.2);
+  });
+
+  btnZoomOut?.addEventListener('click', () => {
+    if (!currentImage) return;
+    setManualZoom(zoomScale / 1.2);
+  });
+
+  btnZoom100?.addEventListener('click', () => {
+    if (!currentImage) return;
+    zoomMode = 'manual';
+    zoomScale = 1;
+    panX = 0;
+    panY = 0;
+    applyViewportTransform();
+  });
+
+  btnZoomFit?.addEventListener('click', () => {
+    if (!currentImage) return;
+    fitCanvasToStage();
+  });
 
   // Bindings dos sliders e campos numéricos de sombra
   for (const key of controlKeys) {
@@ -445,8 +617,11 @@ export function initImagePolisher(): void {
 
   // Botão Resetar
   btnReset?.addEventListener('click', () => {
+    zoomMode = 'fit';
+    panX = 0;
+    panY = 0;
     applyPreset('medio');
-    showToast('Ajustes restaurados para o padrão Médio');
+    showToast('Ajustes e enquadramento restaurados');
   });
 
   // Botão Carregar Exemplo

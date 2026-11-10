@@ -101,7 +101,7 @@ import Layout from '../layouts/Layout.astro';
   </header>
 
   <!-- Main Workspace Layout -->
-  <div class="flex flex-1 min-h-0 flex-col lg:flex-row lg:h-[calc(100vh-4rem)]">
+  <div class="flex flex-1 min-h-0 min-w-0 flex-col lg:flex-row lg:h-[calc(100dvh-4rem)] lg:overflow-hidden">
     <!-- Sidebar de Controles -->
     <aside
       class="w-full lg:w-84 shrink-0 border-b lg:border-b-0 lg:border-r border-[var(--border-color)] bg-[var(--bg-panel)] overflow-y-auto p-5"
@@ -438,88 +438,143 @@ import Layout from '../layouts/Layout.astro';
       </form>
     </aside>
 
-    <!-- Área de Trabalho (Palco do Canvas) -->
-    <main class="flex-1 relative flex flex-col items-center justify-center p-6 lg:p-10 overflow-hidden">
-      <!-- Seletor de Fundo do Preview (apenas visualização, não afeta a transparência real) -->
-      <div
-        class="absolute top-4 right-4 z-10 flex items-center gap-1 p-1 rounded-lg bg-[var(--bg-panel)] border border-[var(--border-color)] shadow-sm"
-        role="group"
-        aria-label="Fundo de visualização do palco"
-      >
-        <span class="text-[11px] font-medium text-[var(--text-muted)] px-2">Preview:</span>
-        <button
-          type="button"
-          data-stage-theme="checkerboard"
-          aria-pressed="true"
-          class="px-2.5 py-1 rounded-md text-xs font-medium aria-pressed:bg-purple-500/15 aria-pressed:text-[var(--color-brand)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
-        >
-          Transparente
-        </button>
-        <button
-          type="button"
-          data-stage-theme="light"
-          aria-pressed="false"
-          class="px-2.5 py-1 rounded-md text-xs font-medium aria-pressed:bg-purple-500/15 aria-pressed:text-[var(--color-brand)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
-        >
-          Claro
-        </button>
-        <button
-          type="button"
-          data-stage-theme="dark"
-          aria-pressed="false"
-          class="px-2.5 py-1 rounded-md text-xs font-medium aria-pressed:bg-purple-500/15 aria-pressed:text-[var(--color-brand)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
-        >
-          Escuro
-        </button>
-      </div>
-
-      <!-- Wrapper do Palco -->
+    <!-- Área de Trabalho (Palco do Canvas Físico e Travado) -->
+    <main class="flex-1 min-w-0 min-h-0 relative flex flex-col p-4 lg:p-6 overflow-hidden">
+      <!-- Wrapper do Palco (Dimensões Físicas Fixas na Viewport) -->
       <div
         id="stage-wrapper"
-        class="stage-checkerboard w-full h-full max-w-full max-h-full rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-center p-6 overflow-hidden transition-colors"
+        class="stage-checkerboard relative flex-1 w-full min-w-0 h-[500px] lg:h-full rounded-2xl border border-[var(--border-color)] shadow-sm overflow-hidden select-none transition-colors"
       >
-        <!-- Estado Inicial Vazio -->
+        <!-- Seletor de Fundo do Preview (apenas visualização, não afeta a transparência real) -->
+        <div
+          id="stage-theme-toolbar"
+          class="absolute top-3 right-3 z-20 flex items-center gap-1 p-1 rounded-lg bg-[var(--bg-panel)]/95 backdrop-blur border border-[var(--border-color)] shadow-sm"
+          role="group"
+          aria-label="Fundo de visualização do palco"
+        >
+          <span class="text-[11px] font-medium text-[var(--text-muted)] px-2">Preview:</span>
+          <button
+            type="button"
+            data-stage-theme="checkerboard"
+            aria-pressed="true"
+            class="px-2.5 py-1 rounded-md text-xs font-medium aria-pressed:bg-purple-500/15 aria-pressed:text-[var(--color-brand)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
+          >
+            Transparente
+          </button>
+          <button
+            type="button"
+            data-stage-theme="light"
+            aria-pressed="false"
+            class="px-2.5 py-1 rounded-md text-xs font-medium aria-pressed:bg-purple-500/15 aria-pressed:text-[var(--color-brand)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
+          >
+            Claro
+          </button>
+          <button
+            type="button"
+            data-stage-theme="dark"
+            aria-pressed="false"
+            class="px-2.5 py-1 rounded-md text-xs font-medium aria-pressed:bg-purple-500/15 aria-pressed:text-[var(--color-brand)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
+          >
+            Escuro
+          </button>
+        </div>
+
+        <!-- Barra Flutuante de Zoom, Pan e Auto-Fit -->
+        <div
+          id="zoom-toolbar"
+          class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 p-1 rounded-xl bg-[var(--bg-panel)]/95 backdrop-blur border border-[var(--border-color)] shadow-md"
+          role="group"
+          aria-label="Controles de zoom e ajuste do palco"
+        >
+          <button
+            type="button"
+            id="btn-zoom-out"
+            class="w-7 h-7 flex items-center justify-center rounded-lg text-sm font-semibold text-[var(--text-main)] hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+            title="Diminuir Zoom (Roda do mouse para baixo)"
+            aria-label="Diminuir Zoom"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            id="btn-zoom-100"
+            class="min-w-[54px] px-2 py-1 rounded-lg text-xs font-mono font-medium text-[var(--text-main)] hover:bg-[var(--bg-subtle)] transition cursor-pointer text-center"
+            title="Clique para ver em 100% (1:1 pixels reais)"
+          >
+            100%
+          </button>
+          <button
+            type="button"
+            id="btn-zoom-in"
+            class="w-7 h-7 flex items-center justify-center rounded-lg text-sm font-semibold text-[var(--text-main)] hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+            title="Aumentar Zoom (Roda do mouse para cima)"
+            aria-label="Aumentar Zoom"
+          >
+            +
+          </button>
+          <div class="w-px h-4 bg-[var(--border-color)] mx-0.5" aria-hidden="true"></div>
+          <button
+            type="button"
+            id="btn-zoom-fit"
+            aria-pressed="true"
+            class="px-2.5 py-1 rounded-lg text-xs font-medium aria-pressed:bg-purple-500/15 aria-pressed:text-[var(--color-brand)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
+            title="Auto-redimensionar e centralizar automaticamente no palco (Duplo clique no palco)"
+          >
+            Auto-Ajustar
+          </button>
+        </div>
+
+        <!-- Estado Inicial Vazio (Isolado em absolute inset-0) -->
         <div
           id="empty-state"
-          class="max-w-md text-center p-8 rounded-2xl bg-[var(--bg-panel)]/95 backdrop-blur border border-[var(--border-color)] shadow-lg flex flex-col items-center gap-4"
+          class="absolute inset-0 flex items-center justify-center p-6"
         >
           <div
-            class="w-12 h-12 rounded-2xl bg-purple-500/10 text-[var(--color-brand)] flex items-center justify-center"
+            class="max-w-md text-center p-8 rounded-2xl bg-[var(--bg-panel)]/95 backdrop-blur border border-[var(--border-color)] shadow-lg flex flex-col items-center gap-4"
           >
-            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              ></path>
-            </svg>
-          </div>
-          <div>
-            <h2 class="text-base font-semibold m-0 mb-1">Pronto para polir seu print</h2>
-            <p class="text-xs text-[var(--text-muted)] m-0 leading-relaxed">
-              Tire um print (<kbd class="px-1.5 py-0.5 rounded bg-[var(--bg-subtle)] border border-[var(--border-color)] font-mono">Win + Shift + S</kbd>) e pressione <kbd class="px-1.5 py-0.5 rounded bg-[var(--bg-subtle)] border border-[var(--border-color)] font-mono font-semibold text-[var(--color-brand)]">Ctrl + V</kbd> aqui mesmo, ou arraste um arquivo de imagem.
-            </p>
-          </div>
-          <div class="flex items-center gap-2 pt-1">
-            <button
-              type="button"
-              id="btn-sample"
-              class="px-3.5 py-2 rounded-lg text-xs font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-main)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition cursor-pointer"
+            <div
+              class="w-12 h-12 rounded-2xl bg-purple-500/10 text-[var(--color-brand)] flex items-center justify-center"
             >
-              Testar com Print de Exemplo
-            </button>
+              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                ></path>
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-base font-semibold m-0 mb-1">Pronto para polir seu print</h2>
+              <p class="text-xs text-[var(--text-muted)] m-0 leading-relaxed">
+                Tire um print (<kbd class="px-1.5 py-0.5 rounded bg-[var(--bg-subtle)] border border-[var(--border-color)] font-mono">Win + Shift + S</kbd>) e pressione <kbd class="px-1.5 py-0.5 rounded bg-[var(--bg-subtle)] border border-[var(--border-color)] font-mono font-semibold text-[var(--color-brand)]">Ctrl + V</kbd> aqui mesmo, ou arraste um arquivo de imagem.
+              </p>
+            </div>
+            <div class="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                id="btn-sample"
+                class="px-3.5 py-2 rounded-lg text-xs font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-main)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition cursor-pointer"
+              >
+                Testar com Print de Exemplo
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Container do Canvas (visível assim que uma imagem é carregada) -->
+        <!-- Container do Canvas (Isolado em absolute inset-0 para nunca alterar o tamanho físico do palco) -->
         <div
           id="canvas-container"
-          class="hidden w-full h-full flex items-center justify-center overflow-hidden"
+          class="hidden absolute inset-0 overflow-hidden cursor-grab active:cursor-grabbing touch-none"
         >
-          <canvas
-            id="canvas"
-            class="max-w-full max-h-full object-contain block rounded"
-          ></canvas>
+          <div
+            id="canvas-transform"
+            class="w-full h-full flex items-center justify-center pointer-events-none origin-center will-change-transform"
+          >
+            <canvas
+              id="canvas"
+              class="block shrink-0 max-w-none max-h-none rounded"
+            ></canvas>
+          </div>
         </div>
       </div>
 
