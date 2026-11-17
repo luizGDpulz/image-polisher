@@ -160,6 +160,10 @@ export function initImagePolisher(): void {
   const btnBatchAdd = document.getElementById('btn-batch-add') as HTMLButtonElement | null;
   const btnBatchClear = document.getElementById('btn-batch-clear') as HTMLButtonElement | null;
 
+  const btnToolShadow = document.getElementById('btn-tool-shadow') as HTMLButtonElement | null;
+  const toolPropertiesPanel = document.getElementById('tool-properties-panel');
+  const activePresetLabel = document.getElementById('active-preset-label');
+
   const qualityFieldset = document.getElementById('quality-control-wrapper');
   const qualityRange = document.getElementById('quality') as HTMLInputElement | null;
   const qualityNumber = document.getElementById('numQuality') as HTMLInputElement | null;
@@ -278,12 +282,22 @@ export function initImagePolisher(): void {
     }, 2200);
   }
 
+  const PRESET_LABELS: Record<PresetName, string> = {
+    leve: 'Leve',
+    medio: 'Médio',
+    forte: 'Forte',
+    flutuante: 'Flutuante',
+  };
+
   function highlightActivePreset(activePreset: PresetName | null): void {
     const presetButtons = document.querySelectorAll<HTMLButtonElement>('[data-preset]');
     presetButtons.forEach((btn) => {
       const isMatch = btn.dataset.preset === activePreset;
       btn.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
     });
+    if (activePresetLabel) {
+      activePresetLabel.textContent = activePreset ? PRESET_LABELS[activePreset] : 'Personalizado';
+    }
   }
 
   function scheduleSizeEstimation(): void {
@@ -333,6 +347,7 @@ export function initImagePolisher(): void {
     if (dimensionsBadge) {
       dimensionsBadge.textContent = `${activeItem.image.naturalWidth}×${activeItem.image.naturalHeight} → ${dims.width}×${dims.height} px`;
       dimensionsBadge.classList.remove('hidden');
+      dimensionsBadge.classList.add('md:inline-flex');
     }
 
     scheduleSizeEstimation();
@@ -414,9 +429,14 @@ export function initImagePolisher(): void {
     activeIndex = -1;
     if (emptyState) emptyState.classList.remove('hidden');
     if (canvasContainer) canvasContainer.classList.add('hidden');
-    if (dimensionsBadge) dimensionsBadge.textContent = '—';
+    if (zoomToolbar) zoomToolbar.classList.add('hidden');
+    if (dimensionsBadge) {
+      dimensionsBadge.textContent = '';
+      dimensionsBadge.classList.add('hidden');
+      dimensionsBadge.classList.remove('md:inline-flex');
+    }
     if (sizeEstimateBadge) sizeEstimateBadge.textContent = '—';
-    if (fileNameBadge) fileNameBadge.textContent = 'Nenhum';
+    if (fileNameBadge) fileNameBadge.textContent = 'Cole Ctrl+V ou arraste imagens';
     if (btnZoom100) btnZoom100.textContent = '100%';
     if (btnCopy) btnCopy.disabled = true;
     if (btnDownload) btnDownload.disabled = true;
@@ -430,6 +450,7 @@ export function initImagePolisher(): void {
 
     if (emptyState) emptyState.classList.add('hidden');
     if (canvasContainer) canvasContainer.classList.remove('hidden');
+    if (zoomToolbar) zoomToolbar.classList.remove('hidden');
 
     if (fileNameBadge) {
       const batchSuffix = queue.length > 1 ? ` (${index + 1}/${queue.length})` : '';
@@ -618,6 +639,38 @@ export function initImagePolisher(): void {
     pair.number.addEventListener('input', () => onUpdate(pair.number));
   }
 
+  // Botões de Stepper customizado (− / +) substituindo as setinhas nativas
+  document.querySelectorAll<HTMLButtonElement>('[data-step-target]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.dataset.stepTarget;
+      const dir = btn.dataset.stepDir;
+      if (!targetId) return;
+      const inputEl = document.getElementById(targetId) as HTMLInputElement | null;
+      if (!inputEl) return;
+
+      if (dir === '-1') {
+        inputEl.stepDown();
+      } else {
+        inputEl.stepUp();
+      }
+
+      const numericVal = parseFloat(inputEl.value);
+      if (!Number.isNaN(numericVal)) {
+        inputEl.value = String(Number(numericVal.toFixed(4)));
+      }
+      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
+
+  // Alternância do painel de propriedades pelo menu de ícones
+  btnToolShadow?.addEventListener('click', () => {
+    if (!toolPropertiesPanel) return;
+    const isCurrentlyOpen = btnToolShadow.getAttribute('aria-pressed') === 'true';
+    const nextOpen = !isCurrentlyOpen;
+    btnToolShadow.setAttribute('aria-pressed', nextOpen ? 'true' : 'false');
+    toolPropertiesPanel.classList.toggle('hidden', !nextOpen);
+  });
+
   // Bindings de Presets
   document.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -668,11 +721,7 @@ export function initImagePolisher(): void {
     }
 
     if (qualityFieldset) {
-      if (meta.supportsLossyQuality) {
-        qualityFieldset.classList.remove('opacity-50', 'pointer-events-none');
-      } else {
-        qualityFieldset.classList.add('opacity-50', 'pointer-events-none');
-      }
+      qualityFieldset.classList.toggle('hidden', !meta.supportsLossyQuality);
     }
 
     if (formatHint) {

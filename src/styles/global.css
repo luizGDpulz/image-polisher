@@ -173,6 +173,18 @@ label:has(:focus-visible) {
   outline-offset: 2px;
 }
 
+/* Remove setas nativas feias de inputs numéricos */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 /* Sliders finos e sóbrios (guia modern-web-guidance: slider) */
 input[type="range"] {
   --slider-track-size: 4px;
