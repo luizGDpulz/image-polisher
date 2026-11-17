@@ -49,36 +49,38 @@ export function loadImageFromFile(file: File): Promise<LoadedImageResult> {
 }
 
 /**
- * Extrai o primeiro arquivo de imagem presente em um evento de Paste (Ctrl+V).
+ * Extrai todos os arquivos de imagem presentes em um evento de Paste (Ctrl+V).
  */
-export function extractImageFromClipboard(event: ClipboardEvent): File | null {
+export function extractImagesFromClipboard(event: ClipboardEvent): File[] {
   const items = event.clipboardData?.items;
-  if (!items) return null;
+  if (!items) return [];
 
+  const result: File[] = [];
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     if (item && item.type.startsWith('image/')) {
       const file = item.getAsFile();
-      if (file) return file;
+      if (file) result.push(file);
     }
   }
-  return null;
+  return result;
 }
 
 /**
- * Extrai o primeiro arquivo de imagem presente em um evento de Drag & Drop.
+ * Extrai todos os arquivos de imagem presentes em um evento de Drag & Drop.
  */
-export function extractImageFromDrop(event: DragEvent): File | null {
+export function extractImagesFromDrop(event: DragEvent): File[] {
   const files = event.dataTransfer?.files;
-  if (!files || files.length === 0) return null;
+  if (!files || files.length === 0) return [];
 
+  const result: File[] = [];
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     if (file && file.type.startsWith('image/')) {
-      return file;
+      result.push(file);
     }
   }
-  return null;
+  return result;
 }
 
 /**
@@ -189,7 +191,7 @@ export function triggerBlobDownload(blob: Blob, baseName: string, format: ImageF
   const url = URL.createObjectURL(blob);
 
   const link = document.createElement('a');
-  link.download = `${baseName} sombreado.${ext}`;
+  link.download = `${baseName}_sombreado.${ext}`;
   link.href = url;
   document.body.appendChild(link);
   link.click();

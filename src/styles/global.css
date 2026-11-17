@@ -1,78 +1,115 @@
 @import "tailwindcss";
 
 :root {
-  /* Raw light & dark brand tokens */
-  --brand-light: #7c3aed;
-  --brand-dark: #a78bfa;
-  --brand-hover-light: #6d28d9;
-  --brand-hover-dark: #c4b5fd;
+  /* Roxo sóbrio (acento contido) */
+  --brand-light: #6741d9;
+  --brand-hover-light: #5f3dc4;
+  --brand-subtle-light: #f3f0ff;
+  --brand-border-light: #d0bfff;
 
-  --surface-app-light: #f3f4f6;
-  --surface-app-dark: #0b0f19;
+  --brand-dark: #9775fa;
+  --brand-hover-dark: #b197fc;
+  --brand-subtle-dark: rgba(151, 117, 250, 0.14);
+  --brand-border-dark: rgba(151, 117, 250, 0.3);
+
+  /* Superfícies neutras (mind-light-style & mind-dark-style) */
+  --surface-app-light: #f1f3f5;
   --surface-panel-light: #ffffff;
-  --surface-panel-dark: #111827;
-  --surface-subtle-light: #f9fafb;
-  --surface-subtle-dark: #1f2937;
+  --surface-subtle-light: #f8f9fa;
+  --surface-muted-light: #f1f3f5;
 
+  --surface-app-dark: #141413;
+  --surface-panel-dark: #1c1c1a;
+  --surface-subtle-dark: #252523;
+  --surface-muted-dark: #2e2e2b;
+
+  /* Hierarquia tipográfica e divisórias sutis 1px */
   --text-main-light: #111827;
-  --text-main-dark: #f9fafb;
-  --text-muted-light: #4b5563;
-  --text-muted-dark: #9ca3af;
+  --text-secondary-light: #37352f;
+  --text-muted-light: #868e96;
 
-  --border-light: #e5e7eb;
-  --border-dark: #1f2937;
-  --border-strong-light: #9ca3af;
-  --border-strong-dark: #4b5563;
+  --text-main-dark: #ededec;
+  --text-secondary-dark: #b5b4b0;
+  --text-muted-dark: #787774;
 
-  --scrollbar-track-light: #f3f4f6;
-  --scrollbar-track-dark: #111827;
-  --scrollbar-thumb-light: #6b7280;
-  --scrollbar-thumb-dark: #6b7280;
+  --border-light: #e9ecef;
+  --border-strong-light: #dee2e6;
+  --border-dark: #2e2e2b;
+  --border-strong-dark: #3e3e3a;
 
-  /* Default fallback tokens before light-dark() */
+  --scrollbar-track-light: #f8f9fa;
+  --scrollbar-track-dark: #1c1c1a;
+  --scrollbar-thumb-light: #ced4da;
+  --scrollbar-thumb-dark: #3e3e3a;
+
+  /* Tokens ativos padrão (light) */
   --color-brand: var(--brand-light);
   --color-brand-hover: var(--brand-hover-light);
+  --brand-subtle: var(--brand-subtle-light);
+  --brand-border: var(--brand-border-light);
+
   --bg-app: var(--surface-app-light);
   --bg-panel: var(--surface-panel-light);
   --bg-subtle: var(--surface-subtle-light);
+  --bg-muted: var(--surface-muted-light);
+
   --text-main: var(--text-main-light);
+  --text-secondary: var(--text-secondary-light);
   --text-muted: var(--text-muted-light);
+
   --border-color: var(--border-light);
   --border-strong: var(--border-strong-light);
+
   --scrollbar-track: var(--scrollbar-track-light);
   --scrollbar-thumb: var(--scrollbar-thumb-light);
 
-  /* Fallback for browsers without light-dark() support */
+  /* Fallback para navegadores sem suporte a light-dark() */
   @media (prefers-color-scheme: dark) {
     --color-brand: var(--brand-dark);
     --color-brand-hover: var(--brand-hover-dark);
+    --brand-subtle: var(--brand-subtle-dark);
+    --brand-border: var(--brand-border-dark);
+
     --bg-app: var(--surface-app-dark);
     --bg-panel: var(--surface-panel-dark);
     --bg-subtle: var(--surface-subtle-dark);
+    --bg-muted: var(--surface-muted-dark);
+
     --text-main: var(--text-main-dark);
+    --text-secondary: var(--text-secondary-dark);
     --text-muted: var(--text-muted-dark);
+
     --border-color: var(--border-dark);
     --border-strong: var(--border-strong-dark);
+
     --scrollbar-track: var(--scrollbar-track-dark);
     --scrollbar-thumb: var(--scrollbar-thumb-dark);
   }
 
-  /* Modern CSS light-dark() automatic resolution */
+  /* Resolução automática moderna via light-dark() */
   @supports (color: light-dark(white, black)) {
     --color-brand: light-dark(var(--brand-light), var(--brand-dark));
     --color-brand-hover: light-dark(var(--brand-hover-light), var(--brand-hover-dark));
+    --brand-subtle: light-dark(var(--brand-subtle-light), var(--brand-subtle-dark));
+    --brand-border: light-dark(var(--brand-border-light), var(--brand-border-dark));
+
     --bg-app: light-dark(var(--surface-app-light), var(--surface-app-dark));
     --bg-panel: light-dark(var(--surface-panel-light), var(--surface-panel-dark));
     --bg-subtle: light-dark(var(--surface-subtle-light), var(--surface-subtle-dark));
+    --bg-muted: light-dark(var(--surface-muted-light), var(--surface-muted-dark));
+
     --text-main: light-dark(var(--text-main-light), var(--text-main-dark));
+    --text-secondary: light-dark(var(--text-secondary-light), var(--text-secondary-dark));
     --text-muted: light-dark(var(--text-muted-light), var(--text-muted-dark));
+
     --border-color: light-dark(var(--border-light), var(--border-dark));
     --border-strong: light-dark(var(--border-strong-light), var(--border-strong-dark));
+
     --scrollbar-track: light-dark(var(--scrollbar-track-light), var(--scrollbar-track-dark));
     --scrollbar-thumb: light-dark(var(--scrollbar-thumb-light), var(--scrollbar-thumb-dark));
   }
 
-  /* Viewport-wide native UI theming + <meta name="color-scheme"> override reflection */
+  /* Sincronização de color-scheme com override via <meta name="color-scheme"> */
   color-scheme: light dark;
 
   &:has(> head > meta[name="color-scheme"][content="dark"]) {
@@ -90,58 +127,15 @@
 
 @supports not (scrollbar-color: auto) {
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-thumb {
     background: var(--scrollbar-thumb);
-    border-radius: 5px;
+    border-radius: 4px;
   }
   ::-webkit-scrollbar-track {
     background: var(--scrollbar-track);
-  }
-}
-
-/* Fallback for older browsers without accent-color support */
-@supports not (accent-color: var(--color-brand)) {
-  input[type="range"] {
-    -webkit-appearance: none;
-    appearance: none;
-    background: transparent;
-  }
-  input[type="range"]::-webkit-slider-runnable-track {
-    width: 100%;
-    height: 8px;
-    background: linear-gradient(to right, var(--color-brand) var(--progress, 50%), #9ca3af var(--progress, 50%));
-    border-radius: 4px;
-  }
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    height: 16px;
-    width: 16px;
-    border-radius: 50%;
-    background: var(--color-brand);
-    cursor: pointer;
-    margin-top: -4px;
-  }
-  input[type="range"]::-moz-range-track {
-    width: 100%;
-    height: 8px;
-    background: #9ca3af;
-    border-radius: 4px;
-  }
-  input[type="range"]::-moz-range-thumb {
-    height: 16px;
-    width: 16px;
-    border-radius: 50%;
-    background: var(--color-brand);
-    cursor: pointer;
-  }
-  input[type="range"]::-moz-range-progress {
-    background-color: var(--color-brand);
-    height: 8px;
-    border-radius: 4px;
   }
 }
 
@@ -169,27 +163,152 @@ body {
   white-space: nowrap !important;
 }
 
-/* Accessible focus outlines */
+/* Foco acessível consistente */
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-label:focus-within {
+summary:focus-visible,
+label:has(:focus-visible) {
   outline: 2px solid var(--color-brand);
   outline-offset: 2px;
 }
 
-/* Stage background patterns for previewing shadow contrast */
+/* Sliders finos e sóbrios (guia modern-web-guidance: slider) */
+input[type="range"] {
+  --slider-track-size: 4px;
+  --slider-thumb-size: 14px;
+  --slider-track-radius: 999px;
+  --slider-thumb-radius: 50%;
+  --slider-track-color: var(--border-strong);
+  --slider-fill-color: var(--color-brand);
+  --slider-thumb-color: var(--color-brand);
+  --slider-direction: to right;
+
+  --attr-min: attr(min type(<number>), 0);
+  --attr-max: attr(max type(<number>), 100);
+  --control-value: attr(value type(<number>), 50);
+  --slider-progress: calc(
+    progress(var(--control-value), var(--attr-min), var(--attr-max)) * 100%
+  );
+
+  appearance: none;
+  inline-size: 100%;
+  block-size: 1.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+
+  &:dir(rtl) {
+    --slider-direction: to left;
+  }
+}
+
+@supports not (opacity: progress(1, 0, 100)) {
+  input[type="range"] {
+    --slider-progress: calc(
+      (var(--control-value) - var(--attr-min)) /
+      (var(--attr-max) - var(--attr-min)) * 100%
+    );
+  }
+}
+
+input[type="range"]:focus-visible {
+  outline: 2px solid var(--slider-fill-color);
+  outline-offset: 3px;
+}
+
+/* WebKit/Blink */
+input[type="range"]::-webkit-slider-runnable-track {
+  block-size: var(--slider-track-size);
+  border: 0;
+  border-radius: var(--slider-track-radius);
+  background: linear-gradient(
+    var(--slider-direction),
+    var(--slider-fill-color) var(--slider-progress),
+    var(--slider-track-color) var(--slider-progress)
+  );
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  inline-size: var(--slider-thumb-size);
+  block-size: var(--slider-thumb-size);
+  margin-block-start: calc(
+    (var(--slider-track-size) - var(--slider-thumb-size)) / 2
+  );
+  border: 0;
+  border-radius: var(--slider-thumb-radius);
+  background: var(--slider-thumb-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+}
+
+/* Firefox */
+input[type="range"]::-moz-range-track {
+  block-size: var(--slider-track-size);
+  border: 0;
+  border-radius: var(--slider-track-radius);
+  background: var(--slider-track-color);
+}
+
+input[type="range"]::-moz-range-progress {
+  block-size: var(--slider-track-size);
+  border-radius: var(--slider-track-radius);
+  background: var(--slider-fill-color);
+}
+
+input[type="range"]::-moz-range-thumb {
+  inline-size: var(--slider-thumb-size);
+  block-size: var(--slider-thumb-size);
+  border: 0;
+  border-radius: var(--slider-thumb-radius);
+  background: var(--slider-thumb-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+}
+
+/* Acordeões nativos (guia modern-web-guidance: accordion) */
+details > summary {
+  list-style: none;
+}
+
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+details::details-content {
+  interpolate-size: allow-keywords;
+  overflow: clip;
+  contain: layout;
+}
+
+details:not([open])::details-content {
+  block-size: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  details::details-content {
+    transition: block-size, content-visibility, display;
+    transition-duration: 0.22s;
+    transition-timing-function: ease-in-out;
+    transition-behavior: allow-discrete;
+  }
+}
+
+/* Fundos do palco de visualização */
 .stage-checkerboard {
-  background: repeating-conic-gradient(#e5e7eb 0% 25%, #ffffff 0% 50%) 50% / 24px 24px;
+  background: repeating-conic-gradient(#e9ecef 0% 25%, #ffffff 0% 50%) 50% / 24px 24px;
 }
 
 :root:has(> head > meta[name="color-scheme"][content="dark"]) .stage-checkerboard {
-  background: repeating-conic-gradient(#1f2937 0% 25%, #111827 0% 50%) 50% / 24px 24px;
+  background: repeating-conic-gradient(#252523 0% 25%, #1c1c1a 0% 50%) 50% / 24px 24px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not(:has(> head > meta[name="color-scheme"][content="light"])) .stage-checkerboard {
-    background: repeating-conic-gradient(#1f2937 0% 25%, #111827 0% 50%) 50% / 24px 24px;
+    background: repeating-conic-gradient(#252523 0% 25%, #1c1c1a 0% 50%) 50% / 24px 24px;
   }
 }
 
@@ -198,5 +317,5 @@ label:focus-within {
 }
 
 .stage-dark {
-  background: #0f172a;
+  background: #181817;
 }

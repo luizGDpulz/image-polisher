@@ -2,11 +2,12 @@ import {
   copyCanvasToClipboard,
   detectSupportedExportFormats,
   encodeCanvasToBlob,
-  extractImageFromClipboard,
-  extractImageFromDrop,
+  extractImagesFromClipboard,
+  extractImagesFromDrop,
   formatByteSize,
   loadImageFromFile,
   triggerBlobDownload,
+  type LoadedImageResult,
 } from '../lib/image-io';
 import { renderShadowCanvas } from '../lib/shadow-engine';
 import {
@@ -22,6 +23,10 @@ import {
 interface NumericControlPair {
   range: HTMLInputElement;
   number: HTMLInputElement;
+}
+
+interface QueueItem extends LoadedImageResult {
+  id: string;
 }
 
 /**
@@ -70,7 +75,7 @@ function createSampleScreenshotFile(): Promise<File> {
     sCtx.fillText('Image Polisher — Print de Exemplo', 90, 27);
 
     // Conteúdo simulado de sistema
-    sCtx.fillStyle = '#7c3aed';
+    sCtx.fillStyle = '#6741d9';
     sCtx.beginPath();
     sCtx.roundRect(28, 70, 140, 28, 6);
     sCtx.fill();
@@ -134,6 +139,7 @@ export function initImagePolisher(): void {
   const btnZoomFit = document.getElementById('btn-zoom-fit') as HTMLButtonElement | null;
 
   const uploadInput = document.getElementById('upload') as HTMLInputElement | null;
+  const uploadAppendInput = document.getElementById('upload-append') as HTMLInputElement | null;
   const dropzoneLabel = document.getElementById('dropzone-label');
   const fileNameBadge = document.getElementById('file-name-badge');
   const dimensionsBadge = document.getElementById('dimensions-badge');
@@ -145,7 +151,14 @@ export function initImagePolisher(): void {
   const btnDownload = document.getElementById('btn-download') as HTMLButtonElement | null;
   const btnSample = document.getElementById('btn-sample') as HTMLButtonElement | null;
   const btnThemeToggle = document.getElementById('btn-theme-toggle') as HTMLButtonElement | null;
+  const downloadActionLabel = document.getElementById('download-action-label');
   const downloadFormatLabel = document.getElementById('download-format-label');
+
+  const batchQueueBar = document.getElementById('batch-queue-bar');
+  const batchCountLabel = document.getElementById('batch-count-label');
+  const batchQueueList = document.getElementById('batch-queue-list');
+  const btnBatchAdd = document.getElementById('btn-batch-add') as HTMLButtonElement | null;
+  const btnBatchClear = document.getElementById('btn-batch-clear') as HTMLButtonElement | null;
 
   const qualityFieldset = document.getElementById('quality-control-wrapper');
   const qualityRange = document.getElementById('quality') as HTMLInputElement | null;
@@ -154,10 +167,15 @@ export function initImagePolisher(): void {
 
   if (!canvas) return;
 
-  let currentImage: HTMLImageElement | null = null;
-  let uploadedBaseName = 'imagem-editada';
-  let originalBytes = 0;
+  let queue: QueueItem[] = [];
+  let activeIndex = -1;
+  let isBatchExporting = false;
   let estimateTimer: number | null = null;
+
+  function getActiveItem(): QueueItem | null {
+    if (activeIndex < 0 || activeIndex >= queue.length) return null;
+    return queue[activeIndex] ?? null;
+  }
 
   // Estado de Zoom, Pan e Auto-Fit dentro do palco físico fixo
   const MIN_ZOOM = 0.1;
@@ -243,6 +261,9 @@ export function initImagePolisher(): void {
     const max = parseFloat(rangeInput.max) || 100;
     const val = parseFloat(rangeInput.value) || 0;
     const pct = ((val - min) / (max - min)) * 100;
+    rangeInput.style.setProperty('--attr-min', String(min));
+    rangeInput.style.setProperty('--attr-max', String(max));
+    rangeInput.style.setProperty('--control-value', String(val));
     rangeInput.style.setProperty('--progress', `${Math.max(0, Math.min(100, pct))}%`);
   }
 
@@ -266,21 +287,23 @@ export function initImagePolisher(): void {
   }
 
   function scheduleSizeEstimation(): void {
-    if (!currentImage || !canvas) return;
+    const activeItem = getActiveItem();
+    if (!activeItem || !canvas) return;
     if (estimateTimer !== null) {
       window.clearTimeout(estimateTimer);
     }
     estimateTimer = window.setTimeout(async () => {
-      if (!currentImage) return;
+      const current = getActiveItem();
+      if (!current) return;
       try {
-        const blob = await encodeCanvasToBlob(canvas, currentImage, shadowState, exportState);
+        const blob = await encodeCanvasToBlob(canvas, current.image, shadowState, exportState);
         const formattedOut = formatByteSize(blob.size);
         const formatMeta = FORMAT_OPTIONS.find((f) => f.mime === exportState.format);
         const extUpper = (formatMeta?.extension ?? 'png').toUpperCase();
 
         if (sizeEstimateBadge) {
-          if (originalBytes > 0 && blob.size < originalBytes) {
-            const savings = Math.round((1 - blob.size / originalBytes) * 100);
+          if (current.originalBytes > 0 && blob.size < current.originalBytes) {
+            const savings = Math.round((1 - blob.size / current.originalBytes) * 100);
             sizeEstimateBadge.textContent = `${extUpper}: ~${formattedOut} (-${savings}%)`;
           } else {
             sizeEstimateBadge.textContent = `${extUpper}: ~${formattedOut}`;
@@ -294,9 +317,10 @@ export function initImagePolisher(): void {
   }
 
   function renderCurrent(): void {
-    if (!currentImage || !canvas) return;
+    const activeItem = getActiveItem();
+    if (!activeItem || !canvas) return;
 
-    const dims = renderShadowCanvas(canvas, currentImage, shadowState);
+    const dims = renderShadowCanvas(canvas, activeItem.image, shadowState);
 
     // Se estiver em modo Auto-Ajustar, recalcula automaticamente a escala para caber no palco fixo
     if (zoomMode === 'fit') {
@@ -307,7 +331,7 @@ export function initImagePolisher(): void {
     applyViewportTransform();
 
     if (dimensionsBadge) {
-      dimensionsBadge.textContent = `${ currentImage.naturalWidth }×${ currentImage.naturalHeight } → ${ dims.width }×${ dims.height } px`;
+      dimensionsBadge.textContent = `${activeItem.image.naturalWidth}×${activeItem.image.naturalHeight} → ${dims.width}×${dims.height} px`;
       dimensionsBadge.classList.remove('hidden');
     }
 
@@ -333,41 +357,154 @@ export function initImagePolisher(): void {
     renderCurrent();
   }
 
-  async function handleFileSelection(file: File, sourceLabel?: string): Promise<void> {
-    try {
-      const result = await loadImageFromFile(file);
-      currentImage = result.image;
-      uploadedBaseName = result.baseName;
-      originalBytes = result.originalBytes;
+  function renderBatchQueueUI(): void {
+    if (downloadActionLabel) {
+      downloadActionLabel.textContent =
+        queue.length > 1 ? `Exportar (${queue.length})` : 'Exportar';
+    }
 
-      if (emptyState) emptyState.classList.add('hidden');
-      if (canvasContainer) canvasContainer.classList.remove('hidden');
-      if (zoomToolbar) zoomToolbar.classList.remove('hidden');
+    if (!batchQueueBar || !batchQueueList) return;
 
-      if (fileNameBadge) {
-        fileNameBadge.textContent = `${result.baseName} (${formatByteSize(result.originalBytes)})`;
+    if (queue.length <= 1) {
+      batchQueueBar.classList.add('hidden');
+      batchQueueList.replaceChildren();
+      return;
+    }
+
+    batchQueueBar.classList.remove('hidden');
+    if (batchCountLabel) {
+      batchCountLabel.textContent = `Lote (${queue.length})`;
+    }
+
+    const fragment = document.createDocumentFragment();
+    queue.forEach((item, index) => {
+      const isActive = index === activeIndex;
+      const wrapper = document.createElement('div');
+      wrapper.className = isActive
+        ? 'inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-lg text-xs font-medium border border-[var(--color-brand)] bg-[var(--brand-subtle)] text-[var(--color-brand)] shrink-0'
+        : 'inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-lg text-xs font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-main)] hover:border-[var(--border-strong)] shrink-0';
+
+      const selectBtn = document.createElement('button');
+      selectBtn.type = 'button';
+      selectBtn.className = 'max-w-[160px] truncate cursor-pointer text-left';
+      selectBtn.textContent = item.baseName;
+      selectBtn.title = `${item.baseName} (${formatByteSize(item.originalBytes)})`;
+      selectBtn.addEventListener('click', () => selectQueueIndex(index));
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className =
+        'w-4 h-4 rounded flex items-center justify-center text-[11px] opacity-60 hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer';
+      removeBtn.textContent = '×';
+      removeBtn.ariaLabel = `Remover ${item.baseName} do lote`;
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeQueueIndex(index);
+      });
+
+      wrapper.append(selectBtn, removeBtn);
+      fragment.appendChild(wrapper);
+    });
+
+    batchQueueList.replaceChildren(fragment);
+  }
+
+  function clearWorkspace(): void {
+    queue = [];
+    activeIndex = -1;
+    if (emptyState) emptyState.classList.remove('hidden');
+    if (canvasContainer) canvasContainer.classList.add('hidden');
+    if (dimensionsBadge) dimensionsBadge.textContent = '—';
+    if (sizeEstimateBadge) sizeEstimateBadge.textContent = '—';
+    if (fileNameBadge) fileNameBadge.textContent = 'Nenhum';
+    if (btnZoom100) btnZoom100.textContent = '100%';
+    if (btnCopy) btnCopy.disabled = true;
+    if (btnDownload) btnDownload.disabled = true;
+    renderBatchQueueUI();
+  }
+
+  function selectQueueIndex(index: number): void {
+    if (index < 0 || index >= queue.length) return;
+    activeIndex = index;
+    const activeItem = queue[index]!;
+
+    if (emptyState) emptyState.classList.add('hidden');
+    if (canvasContainer) canvasContainer.classList.remove('hidden');
+
+    if (fileNameBadge) {
+      const batchSuffix = queue.length > 1 ? ` (${index + 1}/${queue.length})` : '';
+      fileNameBadge.textContent = `${activeItem.baseName}${batchSuffix}`;
+    }
+
+    if (btnCopy) btnCopy.disabled = false;
+    if (btnDownload) btnDownload.disabled = isBatchExporting;
+
+    // Ao trocar ou carregar imagem, ativa o modo Auto-Ajustar centralizado
+    zoomMode = 'fit';
+    panX = 0;
+    panY = 0;
+    renderCurrent();
+    renderBatchQueueUI();
+  }
+
+  function removeQueueIndex(index: number): void {
+    if (index < 0 || index >= queue.length) return;
+    queue.splice(index, 1);
+    if (queue.length === 0) {
+      clearWorkspace();
+      return;
+    }
+    const nextIndex = Math.min(activeIndex, queue.length - 1);
+    selectQueueIndex(Math.max(0, nextIndex));
+  }
+
+  async function handleFilesSelection(
+    files: File[],
+    options?: { append?: boolean; sourceLabel?: string }
+  ): Promise<void> {
+    if (files.length === 0) return;
+
+    const results = await Promise.allSettled(files.map((file) => loadImageFromFile(file)));
+    const loaded: QueueItem[] = [];
+
+    for (const res of results) {
+      if (res.status === 'fulfilled') {
+        const id =
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        loaded.push({ ...res.value, id });
       }
+    }
 
-      if (btnCopy) btnCopy.disabled = false;
-      if (btnDownload) btnDownload.disabled = false;
+    if (loaded.length === 0) {
+      showToast('Não foi possível abrir nenhuma das imagens selecionadas');
+      return;
+    }
 
-      // Ao carregar nova imagem, ativa o modo Auto-Ajustar centralizado
-      zoomMode = 'fit';
-      panX = 0;
-      panY = 0;
-      renderCurrent();
-      if (sourceLabel) {
-        showToast(sourceLabel);
-      }
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Erro ao abrir imagem');
+    const failedCount = files.length - loaded.length;
+
+    if (options?.append && queue.length > 0) {
+      const firstNewIndex = queue.length;
+      queue = [...queue, ...loaded];
+      selectQueueIndex(firstNewIndex);
+    } else {
+      queue = loaded;
+      selectQueueIndex(0);
+    }
+
+    if (loaded.length > 1) {
+      const suffix = failedCount > 0 ? ` (${failedCount} falhou)` : '';
+      showToast(`${loaded.length} imagens carregadas${suffix}`);
+    } else if (options?.sourceLabel) {
+      showToast(options.sourceLabel);
     }
   }
 
   // Observa redimensionamento do palco físico para auto-redimensionar a imagem quando em modo fit
   if (stageWrapper && typeof ResizeObserver !== 'undefined') {
     const ro = new ResizeObserver(() => {
-      if (currentImage && zoomMode === 'fit') {
+      if (getActiveItem() && zoomMode === 'fit') {
         zoomScale = computeFitScale();
         panX = 0;
         panY = 0;
@@ -381,7 +518,7 @@ export function initImagePolisher(): void {
   canvasContainer?.addEventListener(
     'wheel',
     (e) => {
-      if (!currentImage) return;
+      if (!getActiveItem()) return;
       e.preventDefault();
       const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
       setManualZoom(zoomScale * factor, e.clientX, e.clientY);
@@ -397,7 +534,7 @@ export function initImagePolisher(): void {
   let startPanY = 0;
 
   canvasContainer?.addEventListener('pointerdown', (e) => {
-    if (!currentImage || e.button !== 0) return;
+    if (!getActiveItem() || e.button !== 0) return;
     isPanning = true;
     startPointerX = e.clientX;
     startPointerY = e.clientY;
@@ -431,24 +568,24 @@ export function initImagePolisher(): void {
 
   // Duplo clique no palco restaura o Auto-Ajuste
   canvasContainer?.addEventListener('dblclick', () => {
-    if (!currentImage) return;
+    if (!getActiveItem()) return;
     fitCanvasToStage();
     showToast('Imagem ajustada automaticamente ao palco');
   });
 
   // Botões da barra flutuante de Zoom
   btnZoomIn?.addEventListener('click', () => {
-    if (!currentImage) return;
+    if (!getActiveItem()) return;
     setManualZoom(zoomScale * 1.2);
   });
 
   btnZoomOut?.addEventListener('click', () => {
-    if (!currentImage) return;
+    if (!getActiveItem()) return;
     setManualZoom(zoomScale / 1.2);
   });
 
   btnZoom100?.addEventListener('click', () => {
-    if (!currentImage) return;
+    if (!getActiveItem()) return;
     zoomMode = 'manual';
     zoomScale = 1;
     panX = 0;
@@ -457,7 +594,7 @@ export function initImagePolisher(): void {
   });
 
   btnZoomFit?.addEventListener('click', () => {
-    if (!currentImage) return;
+    if (!getActiveItem()) return;
     fitCanvasToStage();
   });
 
@@ -576,42 +713,71 @@ export function initImagePolisher(): void {
     updateRangeProgressFallback(qualityRange);
   }
 
-  // Upload via input file
+  // Upload via input file (suporta múltiplos arquivos)
   uploadInput?.addEventListener('change', () => {
-    const file = uploadInput.files?.[0];
-    if (file) {
-      handleFileSelection(file, 'Imagem carregada');
+    const files = Array.from(uploadInput.files ?? []).filter((f) => f.type.startsWith('image/'));
+    if (files.length > 0) {
+      handleFilesSelection(files, { sourceLabel: 'Imagem carregada' });
       uploadInput.value = '';
     }
   });
 
+  // Adicionar mais imagens ao lote existente
+  btnBatchAdd?.addEventListener('click', () => {
+    uploadAppendInput?.click();
+  });
+
+  uploadAppendInput?.addEventListener('change', () => {
+    const files = Array.from(uploadAppendInput.files ?? []).filter((f) => f.type.startsWith('image/'));
+    if (files.length > 0) {
+      handleFilesSelection(files, {
+        append: true,
+        sourceLabel: 'Imagem adicionada ao lote',
+      });
+      uploadAppendInput.value = '';
+    }
+  });
+
+  btnBatchClear?.addEventListener('click', () => {
+    clearWorkspace();
+    showToast('Fila de imagens limpa');
+  });
+
   // Drag & Drop na página inteira e no dropzone
-  const dragTargets = [document.body, dropzoneLabel].filter(Boolean) as HTMLElement[];
+  const setDropHighlight = (active: boolean) => {
+    const targets = [dropzoneLabel, stageWrapper].filter(Boolean) as HTMLElement[];
+    targets.forEach((el) => {
+      el.classList.toggle('border-[var(--color-brand)]', active);
+      el.classList.toggle('bg-[var(--brand-subtle)]', active);
+    });
+  };
+
+  const dragTargets = [document.body, dropzoneLabel, stageWrapper].filter(Boolean) as HTMLElement[];
   dragTargets.forEach((target) => {
     target.addEventListener('dragover', (e) => {
       e.preventDefault();
-      dropzoneLabel?.classList.add('border-purple-500', 'bg-purple-500/10');
+      setDropHighlight(true);
     });
     target.addEventListener('dragleave', () => {
-      dropzoneLabel?.classList.remove('border-purple-500', 'bg-purple-500/10');
+      setDropHighlight(false);
     });
   });
 
   window.addEventListener('drop', (e) => {
     e.preventDefault();
-    dropzoneLabel?.classList.remove('border-purple-500', 'bg-purple-500/10');
-    const file = extractImageFromDrop(e);
-    if (file) {
-      handleFileSelection(file, 'Imagem carregada via Drag & Drop');
+    setDropHighlight(false);
+    const files = extractImagesFromDrop(e);
+    if (files.length > 0) {
+      handleFilesSelection(files, { sourceLabel: 'Imagem carregada via Drag & Drop' });
     }
   });
 
   // Colar print via Ctrl+V em qualquer lugar da página
   window.addEventListener('paste', (e) => {
-    const file = extractImageFromClipboard(e);
-    if (file) {
+    const files = extractImagesFromClipboard(e);
+    if (files.length > 0) {
       e.preventDefault();
-      handleFileSelection(file, 'Print colado da Área de Transferência (Ctrl+V)');
+      handleFilesSelection(files, { sourceLabel: 'Print colado da Área de Transferência (Ctrl+V)' });
     }
   });
 
@@ -627,12 +793,12 @@ export function initImagePolisher(): void {
   // Botão Carregar Exemplo
   btnSample?.addEventListener('click', async () => {
     const sampleFile = await createSampleScreenshotFile();
-    await handleFileSelection(sampleFile, 'Print de exemplo carregado');
+    await handleFilesSelection([sampleFile], { sourceLabel: 'Print de exemplo carregado' });
   });
 
   // Ação de Copiar para Área de Transferência
   async function handleCopyAction(): Promise<void> {
-    if (!currentImage || !canvas) return;
+    if (!getActiveItem() || !canvas) return;
     try {
       await copyCanvasToClipboard(canvas);
       showToast('Imagem copiada para a Área de Transferência! (Ctrl+V para colar)');
@@ -647,7 +813,7 @@ export function initImagePolisher(): void {
   window.addEventListener('keydown', (e) => {
     const activeTag = document.activeElement?.tagName;
     const isInputFocused = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT';
-    if (!isInputFocused && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && currentImage) {
+    if (!isInputFocused && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && getActiveItem()) {
       const selection = window.getSelection()?.toString();
       if (!selection) {
         e.preventDefault();
@@ -656,18 +822,48 @@ export function initImagePolisher(): void {
     }
   });
 
-  // Botão de Download / Exportação no formato e compressão escolhidos
+  // Botão de Download / Exportação no formato e compressão escolhidos (individual ou em lote)
   btnDownload?.addEventListener('click', async () => {
-    if (!currentImage || !canvas) return;
+    if (queue.length === 0 || !canvas || isBatchExporting) return;
+
+    const formatMeta = FORMAT_OPTIONS.find((f) => f.mime === exportState.format);
+    const extUpper = (formatMeta?.extension ?? 'png').toUpperCase();
+
+    if (queue.length === 1) {
+      const single = queue[0]!;
+      try {
+        const blob = await encodeCanvasToBlob(canvas, single.image, shadowState, exportState);
+        triggerBlobDownload(blob, single.baseName, exportState.format);
+        showToast(`Exportado em ${extUpper} (${formatByteSize(blob.size)})`);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Falha na exportação');
+      }
+      return;
+    }
+
+    isBatchExporting = true;
+    btnDownload.disabled = true;
+    const offscreenCanvas = document.createElement('canvas');
+
     try {
-      const blob = await encodeCanvasToBlob(canvas, currentImage, shadowState, exportState);
-      triggerBlobDownload(blob, uploadedBaseName, exportState.format);
-      const formatMeta = FORMAT_OPTIONS.find((f) => f.mime === exportState.format);
-      showToast(
-        `Exportado em ${formatMeta?.extension.toUpperCase()} (${formatByteSize(blob.size)})`
-      );
+      for (let i = 0; i < queue.length; i++) {
+        const item = queue[i]!;
+        showToast(`Exportando ${i + 1}/${queue.length}: ${item.baseName}...`);
+        renderShadowCanvas(offscreenCanvas, item.image, shadowState);
+        const blob = await encodeCanvasToBlob(offscreenCanvas, item.image, shadowState, exportState);
+        triggerBlobDownload(blob, item.baseName, exportState.format);
+
+        // Pequena pausa entre downloads para evitar bloqueio/descarte pelo navegador
+        if (i < queue.length - 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, 160));
+        }
+      }
+      showToast(`${queue.length} imagens exportadas em ${extUpper}!`);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Falha na exportação');
+      showToast(err instanceof Error ? err.message : 'Falha na exportação em lote');
+    } finally {
+      isBatchExporting = false;
+      btnDownload.disabled = queue.length === 0;
     }
   });
 
