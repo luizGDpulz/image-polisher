@@ -1,3 +1,4 @@
+import { encodeAnimatedGifToBlob } from '../lib/gif-engine';
 import {
   copyCanvasToClipboard,
   detectSupportedExportFormats,
@@ -168,6 +169,7 @@ export function initImagePolisher(): void {
   const qualityRange = document.getElementById('quality') as HTMLInputElement | null;
   const qualityNumber = document.getElementById('numQuality') as HTMLInputElement | null;
   const formatHint = document.getElementById('format-hint');
+  const gifFormatNote = document.getElementById('gif-format-note');
 
   if (!canvas) return;
 
@@ -175,6 +177,15 @@ export function initImagePolisher(): void {
   let activeIndex = -1;
   let isBatchExporting = false;
   let estimateTimer: number | null = null;
+  let gifTimer: number | null = null;
+  let gifFrameIndex = 0;
+
+  function stopGifAnimation(): void {
+    if (gifTimer !== null) {
+      window.clearTimeout(gifTimer);
+      gifTimer = null;
+    }
+  }
 
   function getActiveItem(): QueueItem | null {
     if (activeIndex < 0 || activeIndex >= queue.length) return null;
@@ -303,12 +314,20 @@ export function initImagePolisher(): void {
   function scheduleSizeEstimation(): void {
     const activeItem = getActiveItem();
     if (!activeItem || !canvas) return;
+
+    if (activeItem.gifFrames && activeItem.gifFrames.length > 1) {
+      if (sizeEstimateBadge) {
+        sizeEstimateBadge.textContent = `GIF • ${activeItem.gifFrames.length} frames`;
+      }
+      return;
+    }
+
     if (estimateTimer !== null) {
       window.clearTimeout(estimateTimer);
     }
     estimateTimer = window.setTimeout(async () => {
       const current = getActiveItem();
-      if (!current) return;
+      if (!current || (current.gifFrames && current.gifFrames.length > 1)) return;
       try {
         const blob = await encodeCanvasToBlob(canvas, current.image, shadowState, exportState);
         const formattedOut = formatByteSize(blob.size);
@@ -330,11 +349,49 @@ export function initImagePolisher(): void {
     }, 120);
   }
 
+  function renderCurrentFrameOnly(): void {
+    const activeItem = getActiveItem();
+    if (!activeItem || !canvas) return;
+
+    const frames = activeItem.gifFrames;
+    const source =
+      frames && frames.length > 1
+        ? frames[gifFrameIndex % frames.length]!.canvas
+        : activeItem.image;
+
+    const dims = renderShadowCanvas(canvas, source, shadowState);
+
+    if (dimensionsBadge) {
+      dimensionsBadge.textContent = `${activeItem.width}×${activeItem.height} → ${dims.width}×${dims.height} px`;
+      dimensionsBadge.classList.remove('hidden');
+      dimensionsBadge.classList.add('md:inline-flex');
+    }
+  }
+
+  function startGifAnimationIfNeeded(): void {
+    stopGifAnimation();
+    const activeItem = getActiveItem();
+    const frames = activeItem?.gifFrames;
+    if (!frames || frames.length <= 1) return;
+
+    const tick = () => {
+      const current = getActiveItem();
+      if (!current || current.gifFrames !== frames) return;
+      gifFrameIndex = (gifFrameIndex + 1) % frames.length;
+      renderCurrentFrameOnly();
+      const nextDelay = frames[gifFrameIndex]!.delayMs;
+      gifTimer = window.setTimeout(tick, nextDelay);
+    };
+
+    const initialDelay = frames[gifFrameIndex % frames.length]!.delayMs;
+    gifTimer = window.setTimeout(tick, initialDelay);
+  }
+
   function renderCurrent(): void {
     const activeItem = getActiveItem();
     if (!activeItem || !canvas) return;
 
-    const dims = renderShadowCanvas(canvas, activeItem.image, shadowState);
+    renderCurrentFrameOnly();
 
     // Se estiver em modo Auto-Ajustar, recalcula automaticamente a escala para caber no palco fixo
     if (zoomMode === 'fit') {
@@ -343,12 +400,6 @@ export function initImagePolisher(): void {
       panY = 0;
     }
     applyViewportTransform();
-
-    if (dimensionsBadge) {
-      dimensionsBadge.textContent = `${activeItem.image.naturalWidth}×${activeItem.image.naturalHeight} → ${dims.width}×${dims.height} px`;
-      dimensionsBadge.classList.remove('hidden');
-      dimensionsBadge.classList.add('md:inline-flex');
-    }
 
     scheduleSizeEstimation();
   }
@@ -425,6 +476,8 @@ export function initImagePolisher(): void {
   }
 
   function clearWorkspace(): void {
+    stopGifAnimation();
+    gifFrameIndex = 0;
     queue = [];
     activeIndex = -1;
     if (emptyState) emptyState.classList.remove('hidden');
@@ -441,10 +494,13 @@ export function initImagePolisher(): void {
     if (btnCopy) btnCopy.disabled = true;
     if (btnDownload) btnDownload.disabled = true;
     renderBatchQueueUI();
+    updateFormatUI();
   }
 
   function selectQueueIndex(index: number): void {
     if (index < 0 || index >= queue.length) return;
+    stopGifAnimation();
+    gifFrameIndex = 0;
     activeIndex = index;
     const activeItem = queue[index]!;
 
@@ -465,7 +521,9 @@ export function initImagePolisher(): void {
     panX = 0;
     panY = 0;
     renderCurrent();
+    startGifAnimationIfNeeded();
     renderBatchQueueUI();
+    updateFormatUI();
   }
 
   function removeQueueIndex(index: number): void {
@@ -716,8 +774,21 @@ export function initImagePolisher(): void {
     const meta = FORMAT_OPTIONS.find((f) => f.mime === exportState.format);
     if (!meta) return;
 
+    const hasGif = queue.some((item) => item.gifFrames && item.gifFrames.length > 1);
+    const allGif = queue.length > 0 && queue.every((item) => item.gifFrames && item.gifFrames.length > 1);
+
     if (downloadFormatLabel) {
-      downloadFormatLabel.textContent = meta.extension.toUpperCase();
+      if (allGif) {
+        downloadFormatLabel.textContent = 'GIF';
+      } else if (hasGif) {
+        downloadFormatLabel.textContent = `${meta.extension.toUpperCase()} / GIF`;
+      } else {
+        downloadFormatLabel.textContent = meta.extension.toUpperCase();
+      }
+    }
+
+    if (gifFormatNote) {
+      gifFormatNote.classList.toggle('hidden', !hasGif);
     }
 
     if (qualityFieldset) {
@@ -880,6 +951,27 @@ export function initImagePolisher(): void {
 
     if (queue.length === 1) {
       const single = queue[0]!;
+      if (single.gifFrames && single.gifFrames.length > 1) {
+        isBatchExporting = true;
+        btnDownload.disabled = true;
+        try {
+          showToast(`Codificando GIF (${single.gifFrames.length} frames)...`);
+          const blob = await encodeAnimatedGifToBlob(single.gifFrames, shadowState, (cur, total) => {
+            if (cur === total || cur % 10 === 0) {
+              showToast(`Codificando GIF (${cur}/${total})...`);
+            }
+          });
+          triggerBlobDownload(blob, single.baseName, 'image/gif');
+          showToast(`GIF exportado (${formatByteSize(blob.size)})`);
+        } catch (err) {
+          showToast(err instanceof Error ? err.message : 'Falha ao exportar GIF');
+        } finally {
+          isBatchExporting = false;
+          btnDownload.disabled = false;
+        }
+        return;
+      }
+
       try {
         const blob = await encodeCanvasToBlob(canvas, single.image, shadowState, exportState);
         triggerBlobDownload(blob, single.baseName, exportState.format);
@@ -898,16 +990,22 @@ export function initImagePolisher(): void {
       for (let i = 0; i < queue.length; i++) {
         const item = queue[i]!;
         showToast(`Exportando ${i + 1}/${queue.length}: ${item.baseName}...`);
-        renderShadowCanvas(offscreenCanvas, item.image, shadowState);
-        const blob = await encodeCanvasToBlob(offscreenCanvas, item.image, shadowState, exportState);
-        triggerBlobDownload(blob, item.baseName, exportState.format);
+
+        if (item.gifFrames && item.gifFrames.length > 1) {
+          const blob = await encodeAnimatedGifToBlob(item.gifFrames, shadowState);
+          triggerBlobDownload(blob, item.baseName, 'image/gif');
+        } else {
+          renderShadowCanvas(offscreenCanvas, item.image, shadowState);
+          const blob = await encodeCanvasToBlob(offscreenCanvas, item.image, shadowState, exportState);
+          triggerBlobDownload(blob, item.baseName, exportState.format);
+        }
 
         // Pequena pausa entre downloads para evitar bloqueio/descarte pelo navegador
         if (i < queue.length - 1) {
           await new Promise((resolve) => window.setTimeout(resolve, 160));
         }
       }
-      showToast(`${queue.length} imagens exportadas em ${extUpper}!`);
+      showToast(`${queue.length} arquivos exportados!`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Falha na exportação em lote');
     } finally {

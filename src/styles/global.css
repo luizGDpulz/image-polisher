@@ -331,3 +331,22 @@ details:not([open])::details-content {
 .stage-dark {
   background: #181817;
 }
+
+/* Popover de opções de exportação ancorado ao botão (guia viewport-aware-dropdowns) */
+@supports (position-area: block-end) {
+  #export-options-popover {
+    inset: auto;
+    margin: 0;
+    margin-block-start: 0.5rem;
+    position-area: block-end span-inline-start;
+    position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+  }
+}
+
+@supports not (position-area: block-end) {
+  #export-options-popover {
+    position: fixed;
+    inset: 4.5rem 1rem auto auto;
+    margin: 0;
+  }
+}

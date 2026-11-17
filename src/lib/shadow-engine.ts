@@ -50,14 +50,16 @@ export function calculateSmartPadding(rawConfig: ShadowConfig): { padX: number; 
  */
 export function renderShadowCanvas(
   canvas: HTMLCanvasElement,
-  image: HTMLImageElement,
+  source: HTMLImageElement | HTMLCanvasElement,
   rawConfig: ShadowConfig,
   options?: { fillBackground?: string }
 ): RenderDimensions {
   const config = sanitizeShadowConfig(rawConfig);
   const { padX, padY } = calculateSmartPadding(config);
-  const width = image.naturalWidth + padX * 2;
-  const height = image.naturalHeight + padY * 2;
+  const sourceWidth = source instanceof HTMLImageElement ? source.naturalWidth : source.width;
+  const sourceHeight = source instanceof HTMLImageElement ? source.naturalHeight : source.height;
+  const width = sourceWidth + padX * 2;
+  const height = sourceHeight + padY * 2;
 
   if (canvas.width !== width) canvas.width = width;
   if (canvas.height !== height) canvas.height = height;
@@ -80,7 +82,7 @@ export function renderShadowCanvas(
   ctx.shadowOffsetX = config.offsetX;
   ctx.shadowOffsetY = config.offsetY;
 
-  ctx.drawImage(image, padX, padY);
+  ctx.drawImage(source, padX, padY);
   ctx.restore();
 
   return { width, height, padX, padY };

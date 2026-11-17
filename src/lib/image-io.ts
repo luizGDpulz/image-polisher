@@ -1,3 +1,4 @@
+import { decodeAnimatedGif, type DecodedGifFrame } from './gif-engine';
 import { renderShadowCanvas } from './shadow-engine';
 import { FORMAT_OPTIONS, type ExportConfig, type ImageFormat, type ShadowConfig } from './types';
 
@@ -7,6 +8,7 @@ export interface LoadedImageResult {
   originalBytes: number;
   width: number;
   height: number;
+  gifFrames?: DecodedGifFrame[];
 }
 
 /**
@@ -22,21 +24,19 @@ export function stripExtension(fileName: string): string {
 
 /**
  * Carrega um objeto File de imagem em um HTMLImageElement pronto para desenho em Canvas.
+ * Para GIFs animados, também decodifica todos os frames e delays.
  */
-export function loadImageFromFile(file: File): Promise<LoadedImageResult> {
-  return new Promise((resolve, reject) => {
+export async function loadImageFromFile(file: File): Promise<LoadedImageResult> {
+  const isGif = file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif');
+  const gifPromise = isGif ? decodeAnimatedGif(file).catch(() => null) : Promise.resolve(null);
+
+  const imgPromise = new Promise<HTMLImageElement>((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();
 
     img.onload = () => {
       URL.revokeObjectURL(objectUrl);
-      resolve({
-        image: img,
-        baseName: stripExtension(file.name),
-        originalBytes: file.size,
-        width: img.naturalWidth,
-        height: img.naturalHeight,
-      });
+      resolve(img);
     };
 
     img.onerror = () => {
@@ -46,6 +46,17 @@ export function loadImageFromFile(file: File): Promise<LoadedImageResult> {
 
     img.src = objectUrl;
   });
+
+  const [img, gifDecoded] = await Promise.all([imgPromise, gifPromise]);
+
+  return {
+    image: img,
+    baseName: stripExtension(file.name),
+    originalBytes: file.size,
+    width: gifDecoded ? gifDecoded.width : img.naturalWidth,
+    height: gifDecoded ? gifDecoded.height : img.naturalHeight,
+    gifFrames: gifDecoded?.frames,
+  };
 }
 
 /**
@@ -125,7 +136,7 @@ export async function detectSupportedExportFormats(): Promise<Set<ImageFormat>> 
  */
 export function encodeCanvasToBlob(
   displayCanvas: HTMLCanvasElement,
-  image: HTMLImageElement,
+  source: HTMLImageElement | HTMLCanvasElement,
   shadowConfig: ShadowConfig,
   exportConfig: ExportConfig
 ): Promise<Blob> {
@@ -136,7 +147,7 @@ export function encodeCanvasToBlob(
     let targetCanvas = displayCanvas;
     if (needsSolidBackground) {
       targetCanvas = document.createElement('canvas');
-      renderShadowCanvas(targetCanvas, image, shadowConfig, { fillBackground: '#ffffff' });
+      renderShadowCanvas(targetCanvas, source, shadowConfig, { fillBackground: '#ffffff' });
     }
 
     const qualityArg = formatMeta?.supportsLossyQuality
@@ -185,9 +196,13 @@ export async function copyCanvasToClipboard(canvas: HTMLCanvasElement): Promise<
 /**
  * Dispara o download do Blob gerado com sufixo padronizado e extensão do formato.
  */
-export function triggerBlobDownload(blob: Blob, baseName: string, format: ImageFormat): void {
+export function triggerBlobDownload(
+  blob: Blob,
+  baseName: string,
+  format: ImageFormat | 'image/gif'
+): void {
   const formatMeta = FORMAT_OPTIONS.find((f) => f.mime === format);
-  const ext = formatMeta?.extension ?? 'png';
+  const ext = format === 'image/gif' ? 'gif' : (formatMeta?.extension ?? 'png');
   const url = URL.createObjectURL(blob);
 
   const link = document.createElement('a');
