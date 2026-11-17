@@ -56,7 +56,7 @@ import Layout from '../layouts/Layout.astro';
         <label
           for="upload"
           id="dropzone-label"
-          class="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition cursor-pointer inline-flex items-center gap-1.5"
+          class="h-8 px-3 rounded-lg text-xs font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition cursor-pointer inline-flex items-center gap-1.5"
           title="Escolher ou arrastar imagens"
         >
           <!-- Lucide: upload -->
@@ -152,7 +152,7 @@ import Layout from '../layouts/Layout.astro';
           type="button"
           id="btn-copy"
           disabled
-          class="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-strong)] bg-[var(--bg-panel)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-main)] disabled:opacity-40 disabled:pointer-events-none transition cursor-pointer inline-flex items-center gap-1.5"
+          class="h-8 px-3 rounded-lg text-xs font-medium border border-[var(--border-strong)] bg-[var(--bg-panel)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-main)] disabled:opacity-40 disabled:pointer-events-none transition cursor-pointer inline-flex items-center gap-1.5"
           title="Copiar imagem sombreada para a Área de Transferência (Ctrl+C)"
         >
           <!-- Lucide: copy -->
@@ -172,12 +172,12 @@ import Layout from '../layouts/Layout.astro';
           <span class="hidden sm:inline">Copiar</span>
         </button>
 
-        <div class="inline-flex items-center rounded-lg shadow-xs">
+        <div class="inline-flex items-stretch h-8 rounded-lg shadow-xs overflow-hidden">
           <button
             type="button"
             id="btn-download"
             disabled
-            class="px-3 py-1.5 rounded-l-lg text-xs font-semibold bg-[var(--color-brand)] hover:bg-[var(--color-brand-hover)] text-white disabled:opacity-40 disabled:pointer-events-none transition cursor-pointer inline-flex items-center gap-1.5"
+            class="h-full px-3 text-xs font-semibold bg-[var(--color-brand)] hover:bg-[var(--color-brand-hover)] text-white disabled:opacity-40 disabled:pointer-events-none transition cursor-pointer inline-flex items-center gap-1.5"
           >
             <!-- Lucide: check -->
             <svg
@@ -192,7 +192,7 @@ import Layout from '../layouts/Layout.astro';
             >
               <path d="M20 6 9 17l-5-5"></path>
             </svg>
-            <span>
+            <span class="inline-flex items-center gap-1">
               <span id="download-action-label">Exportar</span>
               <span id="download-format-label">PNG</span>
             </span>
@@ -202,7 +202,7 @@ import Layout from '../layouts/Layout.astro';
             type="button"
             id="btn-export-options"
             popovertarget="export-options-popover"
-            class="px-1.5 py-1.5 rounded-r-lg border-l border-white/20 bg-[var(--color-brand)] hover:bg-[var(--color-brand-hover)] text-white transition cursor-pointer inline-flex items-center justify-center"
+            class="h-full px-2 border-l border-white/20 bg-[var(--color-brand)] hover:bg-[var(--color-brand-hover)] text-white transition cursor-pointer inline-flex items-center justify-center"
             title="Opções de formato e compressão"
             aria-label="Opções de formato e compressão"
           >
