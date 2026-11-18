@@ -1,11 +1,18 @@
 import type { ShadowConfig } from './types';
 
-export interface RenderDimensions {
+export interface SmartPadding {
+  padTop: number;
+  padRight: number;
+  padBottom: number;
+  padLeft: number;
+}
+
+export interface RenderDimensions extends SmartPadding {
   width: number;
   height: number;
-  padX: number;
-  padY: number;
 }
+
+const BLUR_SPREAD_FACTOR = 1.35;
 
 function clampFinite(value: number, min: number, max: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
@@ -23,24 +30,29 @@ export function sanitizeShadowConfig(config: ShadowConfig): ShadowConfig {
 }
 
 /**
- * Calcula a margem (padding) automática por lado para garantir que o raio
- * gaussiano do blur (aprox. 2x blur) somado ao deslocamento (offsetX/offsetY)
- * nunca seja cortado na borda do canvas.
+ * Calcula a margem (padding) direcional automática por lado para acomodar o
+ * decaimento gaussiano do blur (~1.35x blur) considerando a direção do offset,
+ * evitando bordas vazias excessivas sem cortar a sombra nas extremidades.
  */
-export function calculateSmartPadding(rawConfig: ShadowConfig): { padX: number; padY: number } {
+export function calculateSmartPadding(rawConfig: ShadowConfig): SmartPadding {
   const config = sanitizeShadowConfig(rawConfig);
-  const blurRadius = config.blur * 2;
-  const extra = config.extraPadding;
+  const extra = Math.ceil(config.extraPadding);
 
   const hasVisibleShadow =
     config.opacity > 0 && (config.blur > 0 || config.offsetX !== 0 || config.offsetY !== 0);
 
-  const baseSpread = hasVisibleShadow ? Math.ceil(blurRadius) : 0;
+  if (!hasVisibleShadow) {
+    return { padTop: extra, padRight: extra, padBottom: extra, padLeft: extra };
+  }
 
-  const padX = Math.ceil(baseSpread + Math.abs(config.offsetX) + extra);
-  const padY = Math.ceil(baseSpread + Math.abs(config.offsetY) + extra);
+  const baseSpread = Math.ceil(config.blur * BLUR_SPREAD_FACTOR);
 
-  return { padX, padY };
+  return {
+    padLeft: Math.max(0, baseSpread - Math.round(config.offsetX)) + extra,
+    padRight: Math.max(0, baseSpread + Math.round(config.offsetX)) + extra,
+    padTop: Math.max(0, baseSpread - Math.round(config.offsetY)) + extra,
+    padBottom: Math.max(0, baseSpread + Math.round(config.offsetY)) + extra,
+  };
 }
 
 /**
@@ -55,18 +67,18 @@ export function renderShadowCanvas(
   options?: { fillBackground?: string }
 ): RenderDimensions {
   const config = sanitizeShadowConfig(rawConfig);
-  const { padX, padY } = calculateSmartPadding(config);
+  const { padTop, padRight, padBottom, padLeft } = calculateSmartPadding(config);
   const sourceWidth = source instanceof HTMLImageElement ? source.naturalWidth : source.width;
   const sourceHeight = source instanceof HTMLImageElement ? source.naturalHeight : source.height;
-  const width = sourceWidth + padX * 2;
-  const height = sourceHeight + padY * 2;
+  const width = sourceWidth + padLeft + padRight;
+  const height = sourceHeight + padTop + padBottom;
 
   if (canvas.width !== width) canvas.width = width;
   if (canvas.height !== height) canvas.height = height;
 
   const ctx = canvas.getContext('2d');
   if (!ctx) {
-    return { width, height, padX, padY };
+    return { width, height, padTop, padRight, padBottom, padLeft };
   }
 
   ctx.save();
@@ -82,8 +94,8 @@ export function renderShadowCanvas(
   ctx.shadowOffsetX = config.offsetX;
   ctx.shadowOffsetY = config.offsetY;
 
-  ctx.drawImage(source, padX, padY);
+  ctx.drawImage(source, padLeft, padTop);
   ctx.restore();
 
-  return { width, height, padX, padY };
+  return { width, height, padTop, padRight, padBottom, padLeft };
 }
