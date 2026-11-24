@@ -16,6 +16,7 @@ import {
 } from '../lib/image-io';
 import {
   hideAnimatedElement,
+  prefersReducedMotion,
   showAnimatedElement,
   waitForElementAnimations,
 } from '../lib/panel-transitions';
@@ -162,6 +163,8 @@ export function initImagePolisher(): void {
   const downloadActionLabel = document.getElementById('download-action-label');
   const downloadFormatLabel = document.getElementById('download-format-label');
 
+  const footerSingleInfo = document.getElementById('footer-single-info');
+  const footerStatusText = document.getElementById('footer-status-text');
   const batchQueueBar = document.getElementById('batch-queue-bar');
   const batchCountLabel = document.getElementById('batch-count-label');
   const batchQueueList = document.getElementById('batch-queue-list');
@@ -518,21 +521,79 @@ export function initImagePolisher(): void {
     renderCurrent();
   }
 
+  let scrollHintObserver: IntersectionObserver | null = null;
+
+  function updateScrollHintFallback(): void {
+    scrollHintObserver?.disconnect();
+    scrollHintObserver = null;
+    if (!batchQueueList) return;
+
+    batchQueueList.classList.remove('more-start', 'more-end');
+
+    if (
+      typeof window === 'undefined' ||
+      window.CSS?.supports?.('animation-timeline', 'scroll()') ||
+      typeof IntersectionObserver === 'undefined'
+    ) {
+      return;
+    }
+
+    const first = batchQueueList.firstElementChild;
+    const last = batchQueueList.lastElementChild;
+    if (!first || !last) return;
+
+    scrollHintObserver = new IntersectionObserver(
+      (entries) => {
+        for (const { target, intersectionRatio } of entries) {
+          if (target === first) {
+            batchQueueList.classList.toggle('more-start', intersectionRatio < 1);
+          }
+          if (target === last) {
+            batchQueueList.classList.toggle('more-end', intersectionRatio < 1);
+          }
+        }
+      },
+      { root: batchQueueList, threshold: 1, rootMargin: '1px' }
+    );
+
+    scrollHintObserver.observe(first);
+    if (last !== first) {
+      scrollHintObserver.observe(last);
+    }
+  }
+
   function renderBatchQueueUI(): void {
     if (downloadActionLabel) {
       downloadActionLabel.textContent =
         queue.length > 1 ? `Exportar (${queue.length})` : 'Exportar';
     }
 
+    if (btnBatchClear) {
+      btnBatchClear.hidden = queue.length === 0;
+    }
+
+    if (footerStatusText) {
+      footerStatusText.textContent =
+        queue.length === 1
+          ? '1 arquivo aberto — clique em Adicionar para montar um lote'
+          : 'Abra ou arraste múltiplos arquivos para editar e exportar em lote';
+    }
+
     if (!batchQueueBar || !batchQueueList) return;
 
     if (queue.length <= 1) {
-      batchQueueBar.classList.add('hidden');
+      if (footerSingleInfo) showAnimatedElement(footerSingleInfo);
+      batchQueueBar.hidden = true;
       batchQueueList.replaceChildren();
+      scrollHintObserver?.disconnect();
+      scrollHintObserver = null;
+      batchQueueList.classList.remove('more-start', 'more-end');
       return;
     }
 
-    batchQueueBar.classList.remove('hidden');
+    if (footerSingleInfo) footerSingleInfo.hidden = true;
+    showAnimatedElement(batchQueueBar);
+
     if (batchCountLabel) {
       batchCountLabel.textContent = `Lote (${queue.length})`;
     }
@@ -541,21 +602,45 @@ export function initImagePolisher(): void {
     queue.forEach((item, index) => {
       const isActive = index === activeIndex;
       const wrapper = document.createElement('div');
+      wrapper.setAttribute('role', 'listitem');
       wrapper.className = isActive
-        ? 'inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-lg text-xs font-medium border border-[var(--color-brand)] bg-[var(--brand-subtle)] text-[var(--color-brand)] shrink-0'
-        : 'inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-lg text-xs font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-main)] hover:border-[var(--border-strong)] shrink-0';
+        ? 'batch-item inline-flex items-center gap-1.5 pl-1.5 pr-1 py-1 rounded-lg text-xs font-medium border border-[var(--color-brand)] bg-[var(--brand-subtle)] text-[var(--color-brand)] shrink-0'
+        : 'batch-item inline-flex items-center gap-1.5 pl-1.5 pr-1 py-1 rounded-lg text-xs font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-main)] hover:border-[var(--border-strong)] shrink-0';
 
       const selectBtn = document.createElement('button');
       selectBtn.type = 'button';
-      selectBtn.className = 'max-w-[160px] truncate cursor-pointer text-left';
-      selectBtn.textContent = item.baseName;
+      selectBtn.className = 'inline-flex items-center gap-1.5 cursor-pointer text-left min-w-0';
       selectBtn.title = `${item.baseName} (${formatByteSize(item.originalBytes)})`;
+      if (isActive) {
+        selectBtn.setAttribute('aria-current', 'true');
+      }
+
+      const thumb = document.createElement('img');
+      thumb.src = item.thumbDataUrl;
+      thumb.alt = '';
+      thumb.className =
+        'w-6 h-6 rounded object-cover shrink-0 border border-[var(--border-color)] bg-[var(--bg-panel)]';
+
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'max-w-[130px] truncate text-left';
+      labelSpan.textContent = item.baseName;
+
+      selectBtn.append(thumb, labelSpan);
+
+      if (item.gifFrames && item.gifFrames.length > 1) {
+        const gifTag = document.createElement('span');
+        gifTag.className =
+          'text-[9px] font-mono uppercase px-1 py-0.5 rounded bg-[var(--bg-panel)] border border-[var(--border-color)] text-[var(--text-muted)] shrink-0';
+        gifTag.textContent = 'GIF';
+        selectBtn.appendChild(gifTag);
+      }
+
       selectBtn.addEventListener('click', () => selectQueueIndex(index));
 
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className =
-        'w-4 h-4 rounded flex items-center justify-center text-[11px] opacity-60 hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer';
+        'w-5 h-5 rounded flex items-center justify-center text-[12px] opacity-60 hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer shrink-0';
       removeBtn.textContent = '×';
       removeBtn.ariaLabel = `Remover ${item.baseName} do lote`;
       removeBtn.addEventListener('click', (e) => {
@@ -568,6 +653,15 @@ export function initImagePolisher(): void {
     });
 
     batchQueueList.replaceChildren(fragment);
+
+    const activeWrapper = batchQueueList.children[activeIndex] as HTMLElement | undefined;
+    activeWrapper?.scrollIntoView({
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+      inline: 'nearest',
+      block: 'nearest',
+    });
+
+    updateScrollHintFallback();
   }
 
   function clearWorkspace(): void {
@@ -623,13 +717,28 @@ export function initImagePolisher(): void {
 
   function removeQueueIndex(index: number): void {
     if (index < 0 || index >= queue.length) return;
+    const removedEl = batchQueueList?.children[index] as HTMLElement | undefined;
+    const hadFocus = Boolean(removedEl?.contains(document.activeElement));
+
     queue.splice(index, 1);
     if (queue.length === 0) {
       clearWorkspace();
+      if (hadFocus) btnBatchAdd?.focus();
       return;
     }
+
     const nextIndex = Math.min(activeIndex, queue.length - 1);
     selectQueueIndex(Math.max(0, nextIndex));
+
+    if (hadFocus) {
+      if (queue.length <= 1) {
+        btnBatchAdd?.focus();
+      } else {
+        const focusIdx = Math.min(index, queue.length - 1);
+        const targetBtn = batchQueueList?.children[focusIdx]?.querySelector('button');
+        targetBtn?.focus();
+      }
+    }
   }
 
   async function handleFilesSelection(
@@ -1117,6 +1226,19 @@ export function initImagePolisher(): void {
     clearWorkspace();
     showToast('Fila de imagens limpa');
   });
+
+  // Permite rolar horizontalmente a fila do rodapé usando a roda do mouse
+  batchQueueList?.addEventListener(
+    'wheel',
+    (e) => {
+      if (batchQueueList.scrollWidth <= batchQueueList.clientWidth) return;
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+        batchQueueList.scrollLeft += e.deltaY;
+      }
+    },
+    { passive: false }
+  );
 
   // Drag & Drop na página inteira e no dropzone
   const setDropHighlight = (active: boolean) => {

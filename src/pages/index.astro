@@ -1413,42 +1413,6 @@ import Layout from '../layouts/Layout.astro';
 
       <!-- Ilha 3: Palco Principal -->
       <main class="flex-1 min-w-0 min-h-0 relative flex flex-col gap-2.5 overflow-hidden">
-        <!-- Barra de Lote (exibida apenas quando há 2+ imagens carregadas) -->
-        <div
-          id="batch-queue-bar"
-          class="hidden shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-panel)] shadow-[0_2px_10px_rgba(0,0,0,0.03)]"
-          aria-label="Fila de imagens em lote"
-        >
-          <span
-            id="batch-count-label"
-            class="text-[11px] font-semibold text-[var(--text-muted)] shrink-0 pr-1"
-          >
-            Lote (0)
-          </span>
-          <div
-            id="batch-queue-list"
-            class="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto py-0.5"
-          ></div>
-          <div class="flex items-center gap-1.5 shrink-0 pl-1.5 border-l border-[var(--border-color)]">
-            <button
-              type="button"
-              id="btn-batch-add"
-              class="px-2.5 py-1 rounded-lg text-[11px] font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition cursor-pointer"
-              title="Adicionar mais imagens ao lote"
-            >
-              + Adicionar
-            </button>
-            <button
-              type="button"
-              id="btn-batch-clear"
-              class="px-2.5 py-1 rounded-lg text-[11px] font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-red-600 hover:border-red-500/40 transition cursor-pointer"
-              title="Limpar todas as imagens"
-            >
-              Limpar
-            </button>
-          </div>
-        </div>
-
         <!-- Wrapper do Palco -->
         <div
           id="stage-wrapper"
@@ -1697,10 +1661,99 @@ import Layout from '../layouts/Layout.astro';
           id="status-toast"
           role="status"
           aria-live="polite"
-          class="fixed bottom-5 right-5 z-50 px-3.5 py-2 rounded-lg bg-[#1c1c1a] text-white border border-white/10 text-xs font-medium shadow-lg transition-all duration-200 opacity-0 translate-y-2 pointer-events-none"
+          class="fixed bottom-[4.75rem] right-5 z-50 px-3.5 py-2 rounded-lg bg-[#1c1c1a] text-white border border-white/10 text-xs font-medium shadow-lg transition-all duration-200 opacity-0 translate-y-2 pointer-events-none"
         ></div>
       </main>
     </div>
+
+    <!-- Ilha 4: Rodapé Flutuante (Status + Fila de Múltiplos Arquivos) -->
+    <footer
+      id="floating-footer"
+      aria-label="Rodapé de arquivos e fila em lote"
+      class="floating-footer sticky bottom-3 lg:static z-30 shrink-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-panel)]/95 lg:bg-[var(--bg-panel)] backdrop-blur-md shadow-[0_6px_24px_rgba(0,0,0,0.06)] lg:shadow-[0_2px_10px_rgba(0,0,0,0.03)] px-3.5 py-2 flex items-center justify-between gap-3"
+    >
+      <!-- Estado compacto (0 ou 1 arquivo) -->
+      <div
+        id="footer-single-info"
+        class="footer-slot flex-1 min-w-0 items-center gap-2 text-xs text-[var(--text-muted)]"
+      >
+        <!-- Lucide: images -->
+        <svg
+          class="w-3.5 h-3.5 shrink-0 text-[var(--text-muted)]"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M18 22H4a2 2 0 0 1-2-2V6"></path>
+          <path d="m22 13-1.296-1.296a2.41 2.41 0 0 0-3.408 0L11 18"></path>
+          <circle cx="12" cy="8" r="2"></circle>
+          <rect width="16" height="16" x="6" y="2" rx="2"></rect>
+        </svg>
+        <span id="footer-status-text" class="truncate">
+          Abra ou arraste múltiplos arquivos para editar e exportar em lote
+        </span>
+      </div>
+
+      <!-- Fila de Múltiplos Arquivos (exibida quando há 2+ arquivos) -->
+      <div
+        id="batch-queue-bar"
+        hidden
+        class="footer-slot flex-1 min-w-0 items-center gap-2.5"
+        aria-label="Fila de imagens em lote"
+      >
+        <span
+          id="batch-count-label"
+          class="text-[11px] font-semibold text-[var(--text-secondary)] bg-[var(--bg-subtle)] border border-[var(--border-color)] px-2.5 py-1 rounded-lg shrink-0"
+        >
+          Lote (0)
+        </span>
+        <div
+          id="batch-queue-list"
+          role="list"
+          aria-label="Arquivos abertos"
+          class="batch-scroller flex-1 min-w-0 flex items-center gap-2 overflow-x-auto py-0.5"
+        ></div>
+      </div>
+
+      <!-- Ações do Rodapé -->
+      <div class="flex items-center gap-1.5 shrink-0 pl-2.5 border-l border-[var(--border-color)]">
+        <button
+          type="button"
+          id="btn-batch-add"
+          class="h-7 px-2.5 rounded-lg text-[11px] font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition cursor-pointer inline-flex items-center gap-1"
+          title="Adicionar imagens à fila"
+        >
+          <!-- Lucide: plus -->
+          <svg
+            class="w-3 h-3 shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M5 12h14"></path>
+            <path d="M12 5v14"></path>
+          </svg>
+          <span>Adicionar</span>
+        </button>
+        <button
+          type="button"
+          id="btn-batch-clear"
+          hidden
+          class="h-7 px-2.5 rounded-lg text-[11px] font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-red-600 hover:border-red-500/40 transition cursor-pointer"
+          title="Limpar todas as imagens"
+        >
+          Limpar
+        </button>
+      </div>
+    </footer>
   </div>
 
   <script>
