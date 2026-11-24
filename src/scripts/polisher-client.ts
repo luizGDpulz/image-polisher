@@ -329,6 +329,7 @@ export function initImagePolisher(): void {
   }
 
   const PRESET_LABELS: Record<PresetName, string> = {
+    nenhum: 'Nenhum',
     leve: 'Leve',
     medio: 'Médio',
     forte: 'Forte',
