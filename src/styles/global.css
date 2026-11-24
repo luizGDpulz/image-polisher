@@ -366,76 +366,10 @@ details:not([open])::details-content {
   initial-value: 0px;
 }
 
-/* Rail de ferramentas com indicador ativo deslizante (guia anchor-positioning-tab-underline) */
-#tool-rail {
-  position: relative;
-}
-
-#tool-rail .tool-rail-btn[aria-pressed="true"] {
-  anchor-name: --active-tool;
-}
-
-#tool-rail::before {
-  content: "";
-  position: absolute;
-  position-anchor: --active-tool;
-  pointer-events: none;
-  border-radius: 999px;
-  opacity: 1;
-  scale: 1;
-}
-
-@media (max-width: 1023.98px) {
-  #tool-rail::before {
-    border-block-end: 3px solid var(--color-brand);
-    inset-block-end: 3px;
-    inset-inline-start: calc(anchor(self-start) + 10px);
-    inset-inline-end: calc(anchor(self-end) + 10px);
-  }
-}
-
-@media (min-width: 1024px) {
-  #tool-rail::before {
-    border-inline-start: 3px solid var(--color-brand);
-    inset-inline-start: 3px;
-    inset-block-start: calc(anchor(self-start) + 10px);
-    inset-block-end: calc(anchor(self-end) + 10px);
-  }
-}
-
-#tool-rail[data-panel-open="false"]::before {
-  opacity: 0;
-  scale: 0.4;
-}
-
+/* Micro-interação dos botões do rail de ferramentas */
 @media (prefers-reduced-motion: no-preference) {
-  #tool-rail::before {
-    transition:
-      inset 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-      opacity 0.18s ease,
-      scale 0.18s ease;
-  }
-
   #tool-rail .tool-rail-btn:active {
     scale: 0.95;
-  }
-}
-
-@supports not (position-anchor: --active-tool) {
-  #tool-rail::before {
-    content: none;
-  }
-
-  @media (max-width: 1023.98px) {
-    #tool-rail .tool-rail-btn[aria-pressed="true"] {
-      border-block-end: 3px solid var(--color-brand);
-    }
-  }
-
-  @media (min-width: 1024px) {
-    #tool-rail .tool-rail-btn[aria-pressed="true"] {
-      border-inline-start: 3px solid var(--color-brand);
-    }
   }
 }
 
