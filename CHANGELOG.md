@@ -7,11 +7,16 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Não lançado]
 
+## [1.2.0] - 2026-11-24
+
 ### Adicionado
-- Opção **Nenhum** nos estilos predefinidos de sombra para remover a sombra da imagem (mantendo **Médio** como padrão inicial e no reset).
-- Módulo de arredondamento de bordas (`Bordas` no rail de ferramentas) com presets rápidos (`Nenhum`, `Sutil`, `Médio`, `Forte`), controle de raio geral, cantos individuais na gaveta colapsável e suporte completo em preview, cópia, exportação multi-formato e GIFs animados.
-- Animações fluidas de abrir, fechar e trocar de opção no painel de ferramentas (com respeito a `prefers-reduced-motion`).
-- Rodapé flutuante com status contextual, miniaturas dos arquivos abertos em lote, scroll horizontal com fade nas extremidades e ações rápidas (`+ Adicionar` / `Limpar`).
+- Opção **Nenhum** nos estilos predefinidos de sombra para remover a sombra da imagem (mantendo **Médio** como padrão inicial e no reset) (#14).
+- Módulo de arredondamento de bordas (`Bordas` no rail de ferramentas) com presets rápidos (`Nenhum`, `Sutil`, `Médio`, `Forte`), controle de raio geral, cantos individuais na gaveta colapsável e suporte completo em preview, cópia, exportação multi-formato e GIFs animados (#10).
+- Animações fluidas de abrir, fechar e trocar de opção no painel de ferramentas com respeito a `prefers-reduced-motion` (#11).
+- Rodapé flutuante com status contextual, miniaturas dos arquivos abertos em lote, scroll horizontal com fade nas extremidades e ações rápidas (`+ Adicionar` / `Limpar`) (#12).
+
+### Corrigido
+- Cálculo direcional de margem automática (`calculateSmartPadding`) e ajuste dos presets de sombra para evitar bordas vazias excessivas sem cortar o blur nas extremidades (`e900a79`).
 
 ## [1.1.0] - 2026-11-17
 
@@ -36,3 +41,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Workflow de clipboard (`Ctrl+V` / `Ctrl+C`), Drag & Drop e exportação multi-formato (`PNG`, `WebP`, `AVIF`, `JPEG`).
 - Palco com viewport fixa, auto-ajuste, zoom focalizado, pan e alternância de fundo (`Grade`, `Claro`, `Escuro`).
 - Containerização multi-arch (`linux/amd64`, `linux/arm64`) publicada no GHCR.
+
+[Não lançado]: https://github.com/luizGDpulz/image-polisher/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/luizGDpulz/image-polisher/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/luizGDpulz/image-polisher/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/luizGDpulz/image-polisher/releases/tag/v1.0.0
