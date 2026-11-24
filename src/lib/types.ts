@@ -1,6 +1,10 @@
 export type ImageFormat = 'image/png' | 'image/webp' | 'image/jpeg' | 'image/avif';
 
+export type ToolId = 'shadow' | 'corners';
+
 export type PresetName = 'leve' | 'medio' | 'forte' | 'flutuante';
+
+export type BorderRadiusPresetName = 'nenhum' | 'sutil' | 'medio' | 'forte';
 
 export type StageTheme = 'checkerboard' | 'light' | 'dark';
 
@@ -10,6 +14,13 @@ export interface ShadowConfig {
   blur: number;
   opacity: number;
   extraPadding: number;
+}
+
+export interface BorderRadiusConfig {
+  topLeft: number;
+  topRight: number;
+  bottomRight: number;
+  bottomLeft: number;
 }
 
 export interface ExportConfig {
@@ -85,4 +96,11 @@ export const SHADOW_PRESETS: Record<PresetName, ShadowConfig> = {
     opacity: 0.42,
     extraPadding: 0,
   },
+};
+
+export const BORDER_RADIUS_PRESETS: Record<BorderRadiusPresetName, BorderRadiusConfig> = {
+  nenhum: { topLeft: 0, topRight: 0, bottomRight: 0, bottomLeft: 0 },
+  sutil: { topLeft: 8, topRight: 8, bottomRight: 8, bottomLeft: 8 },
+  medio: { topLeft: 16, topRight: 16, bottomRight: 16, bottomLeft: 16 },
+  forte: { topLeft: 28, topRight: 28, bottomRight: 28, bottomLeft: 28 },
 };

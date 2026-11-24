@@ -401,16 +401,20 @@ import Layout from '../layouts/Layout.astro';
     <div class="flex-1 min-h-0 flex flex-col lg:flex-row gap-3 overflow-hidden">
       <!-- Ilha 2A: Rail de Ferramentas (Menu de Opções com Botões Ícones) -->
       <nav
+        id="tool-rail"
+        data-panel-open="true"
         aria-label="Menu de ferramentas"
         class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-panel)] shadow-[0_2px_10px_rgba(0,0,0,0.03)] p-1.5 flex lg:flex-col items-center gap-1.5 shrink-0 self-start"
       >
         <button
           type="button"
           id="btn-tool-shadow"
+          data-tool="shadow"
           aria-pressed="true"
+          aria-expanded="true"
           aria-controls="tool-properties-panel"
-          class="w-11 h-11 rounded-lg border border-transparent flex flex-col items-center justify-center gap-1 text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subtle)] aria-pressed:bg-[var(--brand-subtle)] aria-pressed:text-[var(--color-brand)] aria-pressed:border-[var(--brand-border)] transition cursor-pointer"
-          title="Propriedades de Sombra e Exportação"
+          class="tool-rail-btn w-11 h-11 rounded-lg border border-transparent flex flex-col items-center justify-center gap-1 text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subtle)] aria-pressed:bg-[var(--brand-subtle)] aria-pressed:text-[var(--color-brand)] aria-pressed:border-[var(--brand-border)] transition cursor-pointer"
+          title="Sombra (clique novamente para recolher)"
         >
           <!-- Lucide: eclipse -->
           <svg
@@ -428,23 +432,56 @@ import Layout from '../layouts/Layout.astro';
           </svg>
           <span class="text-[9px] font-semibold leading-none">Sombra</span>
         </button>
+
+        <button
+          type="button"
+          id="btn-tool-corners"
+          data-tool="corners"
+          aria-pressed="false"
+          aria-expanded="false"
+          aria-controls="tool-properties-panel"
+          class="tool-rail-btn w-11 h-11 rounded-lg border border-transparent flex flex-col items-center justify-center gap-1 text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subtle)] aria-pressed:bg-[var(--brand-subtle)] aria-pressed:text-[var(--color-brand)] aria-pressed:border-[var(--brand-border)] transition cursor-pointer"
+          title="Bordas arredondadas (clique novamente para recolher)"
+        >
+          <!-- Lucide: square-round-corner -->
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 11a8 8 0 0 0-8-8"></path>
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          </svg>
+          <span class="text-[9px] font-semibold leading-none">Bordas</span>
+        </button>
       </nav>
 
       <!-- Coluna de Propriedades da Opção Ativa -->
       <aside
         id="tool-properties-panel"
-        class="w-full lg:w-[296px] shrink-0 flex flex-col gap-3 max-h-[52vh] lg:max-h-full overflow-y-auto pr-0.5"
+        class="tool-panel w-full lg:w-[296px] shrink-0"
       >
-        <form
-          id="polisher-form"
-          aria-label="Controles de Sombra e Exportação"
-          class="flex flex-col gap-3"
+        <div
+          id="tool-panel-inner"
+          class="tool-panel-inner w-full lg:w-[296px] max-h-[52vh] lg:max-h-full overflow-y-auto pr-0.5 pb-0.5"
         >
-          <!-- Ilha 2B: Propriedades da Sombra -->
-          <section
-            aria-labelledby="shadow-card-title"
-            class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-panel)] shadow-[0_2px_10px_rgba(0,0,0,0.03)] overflow-hidden"
+          <form
+            id="polisher-form"
+            aria-label="Controles de Sombra e Bordas"
+            class="flex flex-col gap-3"
           >
+            <div id="tool-pane-stack" class="tool-pane-stack" data-switch-dir="down">
+              <!-- Pane 1: Propriedades da Sombra -->
+              <div class="tool-pane" data-tool-pane="shadow">
+                <section
+                  aria-labelledby="shadow-card-title"
+                  class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-panel)] shadow-[0_2px_10px_rgba(0,0,0,0.03)] overflow-hidden"
+                >
             <div
               class="px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between gap-2"
             >
@@ -756,7 +793,7 @@ import Layout from '../layouts/Layout.astro';
                         name="numBlur"
                         min="0"
                         max="100"
-                        value="26"
+                        value="24"
                         class="w-10 text-center font-mono text-[11px] text-[var(--text-main)] bg-transparent border-0"
                       />
                       <button
@@ -782,7 +819,7 @@ import Layout from '../layouts/Layout.astro';
                       </button>
                     </div>
                   </div>
-                  <input type="range" id="blur" name="blur" min="0" max="100" value="26" />
+                  <input type="range" id="blur" name="blur" min="0" max="100" value="24" />
                 </div>
 
                 <!-- Opacidade -->
@@ -901,7 +938,7 @@ import Layout from '../layouts/Layout.astro';
                         name="numExtraPadding"
                         min="0"
                         max="100"
-                        value="12"
+                        value="0"
                         class="w-10 text-center font-mono text-[11px] text-[var(--text-main)] bg-transparent border-0"
                       />
                       <button
@@ -933,53 +970,449 @@ import Layout from '../layouts/Layout.astro';
                     name="extraPadding"
                     min="0"
                     max="100"
-                    value="12"
+                    value="0"
                   />
                 </div>
               </div>
             </details>
           </section>
-        </form>
+              </div>
+
+              <!-- Pane 2: Propriedades de Bordas Arredondadas -->
+              <div class="tool-pane" data-tool-pane="corners" hidden>
+                <section
+                  aria-labelledby="corners-card-title"
+                  class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-panel)] shadow-[0_2px_10px_rgba(0,0,0,0.03)] overflow-hidden"
+                >
+                  <div
+                    class="px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between gap-2"
+                  >
+                    <h2 id="corners-card-title" class="text-xs font-semibold text-[var(--text-main)] m-0">
+                      Bordas
+                    </h2>
+                    <span
+                      id="active-radius-preset-label"
+                      class="text-[11px] font-medium text-[var(--color-brand)] bg-[var(--brand-subtle)] px-2 py-0.5 rounded-md"
+                    >
+                      Nenhum
+                    </span>
+                  </div>
+
+                  <!-- Estilos Predefinidos + Raio Geral -->
+                  <div class="p-3.5 flex flex-col gap-3.5">
+                    <fieldset class="border-0 p-0 m-0">
+                      <legend
+                        class="block text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-2"
+                      >
+                        Estilos Predefinidos
+                      </legend>
+                      <div class="grid grid-cols-4 gap-1.5">
+                        <button
+                          type="button"
+                          data-radius-preset="nenhum"
+                          aria-pressed="true"
+                          class="py-2 px-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-strong)] aria-pressed:bg-[var(--color-brand)] aria-pressed:border-[var(--color-brand)] aria-pressed:text-white transition cursor-pointer flex flex-col items-center justify-center gap-1"
+                          title="Cantos retos (0px)"
+                        >
+                          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                            <rect x="4" y="4" width="12" height="12" rx="0" stroke="currentColor" stroke-width="1.5" />
+                          </svg>
+                          <span class="text-[10px] font-medium leading-none">Nenhum</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          data-radius-preset="sutil"
+                          aria-pressed="false"
+                          class="py-2 px-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-strong)] aria-pressed:bg-[var(--color-brand)] aria-pressed:border-[var(--color-brand)] aria-pressed:text-white transition cursor-pointer flex flex-col items-center justify-center gap-1"
+                          title="Arredondamento sutil (8px)"
+                        >
+                          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                            <rect x="4" y="4" width="12" height="12" rx="2.5" stroke="currentColor" stroke-width="1.5" />
+                          </svg>
+                          <span class="text-[10px] font-medium leading-none">Sutil</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          data-radius-preset="medio"
+                          aria-pressed="false"
+                          class="py-2 px-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-strong)] aria-pressed:bg-[var(--color-brand)] aria-pressed:border-[var(--color-brand)] aria-pressed:text-white transition cursor-pointer flex flex-col items-center justify-center gap-1"
+                          title="Arredondamento equilibrado (16px)"
+                        >
+                          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                            <rect x="4" y="4" width="12" height="12" rx="4.5" stroke="currentColor" stroke-width="1.5" />
+                          </svg>
+                          <span class="text-[10px] font-medium leading-none">Médio</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          data-radius-preset="forte"
+                          aria-pressed="false"
+                          class="py-2 px-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-strong)] aria-pressed:bg-[var(--color-brand)] aria-pressed:border-[var(--color-brand)] aria-pressed:text-white transition cursor-pointer flex flex-col items-center justify-center gap-1"
+                          title="Arredondamento acentuado (28px)"
+                        >
+                          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                            <rect x="4" y="4" width="12" height="12" rx="6" stroke="currentColor" stroke-width="1.5" />
+                          </svg>
+                          <span class="text-[10px] font-medium leading-none">Forte</span>
+                        </button>
+                      </div>
+                    </fieldset>
+
+                    <!-- Controle Principal: Raio (px) -->
+                    <div class="flex flex-col gap-1">
+                      <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                          <label
+                            for="radiusAll"
+                            class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]"
+                          >
+                            Raio (px)
+                          </label>
+                          <span
+                            id="radius-mixed-hint"
+                            class="hidden text-[10px] font-medium text-[var(--color-brand)]"
+                          >
+                            Individual
+                          </span>
+                        </div>
+                        <label for="numRadiusAll" class="visually-hidden">Valor numérico de Raio</label>
+                        <div
+                          class="inline-flex items-center rounded-md border border-[var(--border-color)] bg-[var(--bg-panel)] p-0.5"
+                        >
+                          <button
+                            type="button"
+                            data-step-target="numRadiusAll"
+                            data-step-dir="-1"
+                            class="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+                            aria-label="Diminuir Raio"
+                          >
+                            <svg
+                              class="w-3 h-3"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M5 12h14"></path>
+                            </svg>
+                          </button>
+                          <input
+                            type="number"
+                            id="numRadiusAll"
+                            name="numRadiusAll"
+                            min="0"
+                            max="500"
+                            step="1"
+                            value="0"
+                            class="w-10 text-center font-mono text-[11px] text-[var(--text-main)] bg-transparent border-0"
+                          />
+                          <button
+                            type="button"
+                            data-step-target="numRadiusAll"
+                            data-step-dir="1"
+                            class="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+                            aria-label="Aumentar Raio"
+                          >
+                            <svg
+                              class="w-3 h-3"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M5 12h14"></path>
+                              <path d="M12 5v14"></path>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                      <input type="range" id="radiusAll" name="radiusAll" min="0" max="120" step="1" value="0" />
+                    </div>
+                  </div>
+
+                  <!-- Gaveta Colapsável: Cantos Individuais -->
+                  <details
+                    id="custom-corners-details"
+                    class="group border-t border-[var(--border-color)]"
+                  >
+                    <summary
+                      class="px-4 py-2.5 flex items-center justify-between cursor-pointer select-none hover:bg-[var(--bg-subtle)]/70 transition"
+                    >
+                      <span class="flex items-center gap-2">
+                        <!-- Lucide: sliders-horizontal -->
+                        <svg
+                          class="w-[13px] h-[13px] text-[var(--text-muted)] group-open:text-[var(--color-brand)] transition-colors"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          stroke-width="1.75"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <line x1="21" x2="14" y1="4" y2="4"></line>
+                          <line x1="10" x2="3" y1="4" y2="4"></line>
+                          <line x1="21" x2="12" y1="12" y2="12"></line>
+                          <line x1="8" x2="3" y1="12" y2="12"></line>
+                          <line x1="21" x2="16" y1="20" y2="20"></line>
+                          <line x1="12" x2="3" y1="20" y2="20"></line>
+                          <line x1="14" x2="14" y1="2" y2="6"></line>
+                          <line x1="8" x2="8" y1="10" y2="14"></line>
+                          <line x1="16" x2="16" y1="18" y2="22"></line>
+                        </svg>
+                        <span
+                          class="text-xs font-medium text-[var(--text-secondary)] group-open:text-[var(--text-main)]"
+                        >
+                          Cantos individuais
+                        </span>
+                      </span>
+                      <!-- Lucide: chevron-down -->
+                      <svg
+                        class="w-3.5 h-3.5 text-[var(--text-muted)] transition-transform duration-200 group-open:rotate-180"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="1.75"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="m6 9 6 6 6-6"></path>
+                      </svg>
+                    </summary>
+
+                    <div class="px-4 pb-4 pt-2.5 flex flex-col gap-3 bg-[var(--bg-subtle)]/35">
+                      <!-- Superior Esquerdo -->
+                      <div class="flex flex-col gap-1">
+                        <div class="flex items-center justify-between gap-2">
+                          <label
+                            for="radiusTL"
+                            class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]"
+                          >
+                            Superior Esq. (px)
+                          </label>
+                          <label for="numRadiusTL" class="visually-hidden">Valor numérico do canto Superior Esquerdo</label>
+                          <div
+                            class="inline-flex items-center rounded-md border border-[var(--border-color)] bg-[var(--bg-panel)] p-0.5"
+                          >
+                            <button
+                              type="button"
+                              data-step-target="numRadiusTL"
+                              data-step-dir="-1"
+                              class="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+                              aria-label="Diminuir Superior Esquerdo"
+                            >
+                              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M5 12h14"></path>
+                              </svg>
+                            </button>
+                            <input
+                              type="number"
+                              id="numRadiusTL"
+                              name="numRadiusTL"
+                              min="0"
+                              max="500"
+                              step="1"
+                              value="0"
+                              class="w-10 text-center font-mono text-[11px] text-[var(--text-main)] bg-transparent border-0"
+                            />
+                            <button
+                              type="button"
+                              data-step-target="numRadiusTL"
+                              data-step-dir="1"
+                              class="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+                              aria-label="Aumentar Superior Esquerdo"
+                            >
+                              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M5 12h14"></path>
+                                <path d="M12 5v14"></path>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        <input type="range" id="radiusTL" name="radiusTL" min="0" max="120" step="1" value="0" />
+                      </div>
+
+                      <!-- Superior Direito -->
+                      <div class="flex flex-col gap-1">
+                        <div class="flex items-center justify-between gap-2">
+                          <label
+                            for="radiusTR"
+                            class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]"
+                          >
+                            Superior Dir. (px)
+                          </label>
+                          <label for="numRadiusTR" class="visually-hidden">Valor numérico do canto Superior Direito</label>
+                          <div
+                            class="inline-flex items-center rounded-md border border-[var(--border-color)] bg-[var(--bg-panel)] p-0.5"
+                          >
+                            <button
+                              type="button"
+                              data-step-target="numRadiusTR"
+                              data-step-dir="-1"
+                              class="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+                              aria-label="Diminuir Superior Direito"
+                            >
+                              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M5 12h14"></path>
+                              </svg>
+                            </button>
+                            <input
+                              type="number"
+                              id="numRadiusTR"
+                              name="numRadiusTR"
+                              min="0"
+                              max="500"
+                              step="1"
+                              value="0"
+                              class="w-10 text-center font-mono text-[11px] text-[var(--text-main)] bg-transparent border-0"
+                            />
+                            <button
+                              type="button"
+                              data-step-target="numRadiusTR"
+                              data-step-dir="1"
+                              class="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+                              aria-label="Aumentar Superior Direito"
+                            >
+                              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M5 12h14"></path>
+                                <path d="M12 5v14"></path>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        <input type="range" id="radiusTR" name="radiusTR" min="0" max="120" step="1" value="0" />
+                      </div>
+
+                      <!-- Inferior Direito -->
+                      <div class="flex flex-col gap-1">
+                        <div class="flex items-center justify-between gap-2">
+                          <label
+                            for="radiusBR"
+                            class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]"
+                          >
+                            Inferior Dir. (px)
+                          </label>
+                          <label for="numRadiusBR" class="visually-hidden">Valor numérico do canto Inferior Direito</label>
+                          <div
+                            class="inline-flex items-center rounded-md border border-[var(--border-color)] bg-[var(--bg-panel)] p-0.5"
+                          >
+                            <button
+                              type="button"
+                              data-step-target="numRadiusBR"
+                              data-step-dir="-1"
+                              class="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+                              aria-label="Diminuir Inferior Direito"
+                            >
+                              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M5 12h14"></path>
+                              </svg>
+                            </button>
+                            <input
+                              type="number"
+                              id="numRadiusBR"
+                              name="numRadiusBR"
+                              min="0"
+                              max="500"
+                              step="1"
+                              value="0"
+                              class="w-10 text-center font-mono text-[11px] text-[var(--text-main)] bg-transparent border-0"
+                            />
+                            <button
+                              type="button"
+                              data-step-target="numRadiusBR"
+                              data-step-dir="1"
+                              class="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+                              aria-label="Aumentar Inferior Direito"
+                            >
+                              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M5 12h14"></path>
+                                <path d="M12 5v14"></path>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        <input type="range" id="radiusBR" name="radiusBR" min="0" max="120" step="1" value="0" />
+                      </div>
+
+                      <!-- Inferior Esquerdo -->
+                      <div class="flex flex-col gap-1">
+                        <div class="flex items-center justify-between gap-2">
+                          <label
+                            for="radiusBL"
+                            class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]"
+                          >
+                            Inferior Esq. (px)
+                          </label>
+                          <label for="numRadiusBL" class="visually-hidden">Valor numérico do canto Inferior Esquerdo</label>
+                          <div
+                            class="inline-flex items-center rounded-md border border-[var(--border-color)] bg-[var(--bg-panel)] p-0.5"
+                          >
+                            <button
+                              type="button"
+                              data-step-target="numRadiusBL"
+                              data-step-dir="-1"
+                              class="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+                              aria-label="Diminuir Inferior Esquerdo"
+                            >
+                              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M5 12h14"></path>
+                              </svg>
+                            </button>
+                            <input
+                              type="number"
+                              id="numRadiusBL"
+                              name="numRadiusBL"
+                              min="0"
+                              max="500"
+                              step="1"
+                              value="0"
+                              class="w-10 text-center font-mono text-[11px] text-[var(--text-main)] bg-transparent border-0"
+                            />
+                            <button
+                              type="button"
+                              data-step-target="numRadiusBL"
+                              data-step-dir="1"
+                              class="w-5 h-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+                              aria-label="Aumentar Inferior Esquerdo"
+                            >
+                              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M5 12h14"></path>
+                                <path d="M12 5v14"></path>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        <input type="range" id="radiusBL" name="radiusBL" min="0" max="120" step="1" value="0" />
+                      </div>
+
+                      <button
+                        type="button"
+                        id="btn-sync-corners"
+                        class="w-full py-1.5 px-2.5 rounded-lg text-[11px] font-medium border border-[var(--border-color)] bg-[var(--bg-panel)] text-[var(--text-secondary)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition cursor-pointer"
+                      >
+                        Igualar todos os cantos
+                      </button>
+                    </div>
+                  </details>
+                </section>
+              </div>
+            </div>
+          </form>
+        </div>
       </aside>
 
       <!-- Ilha 3: Palco Principal -->
       <main class="flex-1 min-w-0 min-h-0 relative flex flex-col gap-2.5 overflow-hidden">
-        <!-- Barra de Lote (exibida apenas quando há 2+ imagens carregadas) -->
-        <div
-          id="batch-queue-bar"
-          class="hidden shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-panel)] shadow-[0_2px_10px_rgba(0,0,0,0.03)]"
-          aria-label="Fila de imagens em lote"
-        >
-          <span
-            id="batch-count-label"
-            class="text-[11px] font-semibold text-[var(--text-muted)] shrink-0 pr-1"
-          >
-            Lote (0)
-          </span>
-          <div
-            id="batch-queue-list"
-            class="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto py-0.5"
-          ></div>
-          <div class="flex items-center gap-1.5 shrink-0 pl-1.5 border-l border-[var(--border-color)]">
-            <button
-              type="button"
-              id="btn-batch-add"
-              class="px-2.5 py-1 rounded-lg text-[11px] font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition cursor-pointer"
-              title="Adicionar mais imagens ao lote"
-            >
-              + Adicionar
-            </button>
-            <button
-              type="button"
-              id="btn-batch-clear"
-              class="px-2.5 py-1 rounded-lg text-[11px] font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-red-600 hover:border-red-500/40 transition cursor-pointer"
-              title="Limpar todas as imagens"
-            >
-              Limpar
-            </button>
-          </div>
-        </div>
-
         <!-- Wrapper do Palco -->
         <div
           id="stage-wrapper"
@@ -1218,7 +1651,7 @@ import Layout from '../layouts/Layout.astro';
               id="canvas-transform"
               class="w-full h-full flex items-center justify-center pointer-events-none origin-center will-change-transform"
             >
-              <canvas id="canvas" class="block shrink-0 max-w-none max-h-none rounded"></canvas>
+              <canvas id="canvas" class="block shrink-0 max-w-none max-h-none"></canvas>
             </div>
           </div>
         </div>
@@ -1228,10 +1661,99 @@ import Layout from '../layouts/Layout.astro';
           id="status-toast"
           role="status"
           aria-live="polite"
-          class="fixed bottom-5 right-5 z-50 px-3.5 py-2 rounded-lg bg-[#1c1c1a] text-white border border-white/10 text-xs font-medium shadow-lg transition-all duration-200 opacity-0 translate-y-2 pointer-events-none"
+          class="fixed bottom-[4.75rem] right-5 z-50 px-3.5 py-2 rounded-lg bg-[#1c1c1a] text-white border border-white/10 text-xs font-medium shadow-lg transition-all duration-200 opacity-0 translate-y-2 pointer-events-none"
         ></div>
       </main>
     </div>
+
+    <!-- Ilha 4: Rodapé Flutuante (Status + Fila de Múltiplos Arquivos) -->
+    <footer
+      id="floating-footer"
+      aria-label="Rodapé de arquivos e fila em lote"
+      class="floating-footer sticky bottom-3 lg:static z-30 shrink-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-panel)]/95 lg:bg-[var(--bg-panel)] backdrop-blur-md shadow-[0_6px_24px_rgba(0,0,0,0.06)] lg:shadow-[0_2px_10px_rgba(0,0,0,0.03)] px-3.5 py-2 flex items-center justify-between gap-3"
+    >
+      <!-- Estado compacto (0 ou 1 arquivo) -->
+      <div
+        id="footer-single-info"
+        class="footer-slot flex-1 min-w-0 items-center gap-2 text-xs text-[var(--text-muted)]"
+      >
+        <!-- Lucide: images -->
+        <svg
+          class="w-3.5 h-3.5 shrink-0 text-[var(--text-muted)]"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M18 22H4a2 2 0 0 1-2-2V6"></path>
+          <path d="m22 13-1.296-1.296a2.41 2.41 0 0 0-3.408 0L11 18"></path>
+          <circle cx="12" cy="8" r="2"></circle>
+          <rect width="16" height="16" x="6" y="2" rx="2"></rect>
+        </svg>
+        <span id="footer-status-text" class="truncate">
+          Abra ou arraste múltiplos arquivos para editar e exportar em lote
+        </span>
+      </div>
+
+      <!-- Fila de Múltiplos Arquivos (exibida quando há 2+ arquivos) -->
+      <div
+        id="batch-queue-bar"
+        hidden
+        class="footer-slot flex-1 min-w-0 items-center gap-2.5"
+        aria-label="Fila de imagens em lote"
+      >
+        <span
+          id="batch-count-label"
+          class="text-[11px] font-semibold text-[var(--text-secondary)] bg-[var(--bg-subtle)] border border-[var(--border-color)] px-2.5 py-1 rounded-lg shrink-0"
+        >
+          Lote (0)
+        </span>
+        <div
+          id="batch-queue-list"
+          role="list"
+          aria-label="Arquivos abertos"
+          class="batch-scroller flex-1 min-w-0 flex items-center gap-2 overflow-x-auto py-0.5"
+        ></div>
+      </div>
+
+      <!-- Ações do Rodapé -->
+      <div class="flex items-center gap-1.5 shrink-0 pl-2.5 border-l border-[var(--border-color)]">
+        <button
+          type="button"
+          id="btn-batch-add"
+          class="h-7 px-2.5 rounded-lg text-[11px] font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition cursor-pointer inline-flex items-center gap-1"
+          title="Adicionar imagens à fila"
+        >
+          <!-- Lucide: plus -->
+          <svg
+            class="w-3 h-3 shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M5 12h14"></path>
+            <path d="M12 5v14"></path>
+          </svg>
+          <span>Adicionar</span>
+        </button>
+        <button
+          type="button"
+          id="btn-batch-clear"
+          hidden
+          class="h-7 px-2.5 rounded-lg text-[11px] font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-red-600 hover:border-red-500/40 transition cursor-pointer"
+          title="Limpar todas as imagens"
+        >
+          Limpar
+        </button>
+      </div>
+    </footer>
   </div>
 
   <script>

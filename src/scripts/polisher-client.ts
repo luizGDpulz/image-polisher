@@ -1,3 +1,7 @@
+import {
+  detectBorderRadiusPreset,
+  MAX_BORDER_RADIUS,
+} from '../lib/border-radius';
 import { encodeAnimatedGifToBlob } from '../lib/gif-engine';
 import {
   copyCanvasToClipboard,
@@ -10,15 +14,25 @@ import {
   triggerBlobDownload,
   type LoadedImageResult,
 } from '../lib/image-io';
+import {
+  hideAnimatedElement,
+  prefersReducedMotion,
+  showAnimatedElement,
+  waitForElementAnimations,
+} from '../lib/panel-transitions';
 import { renderShadowCanvas } from '../lib/shadow-engine';
 import {
+  BORDER_RADIUS_PRESETS,
   FORMAT_OPTIONS,
   SHADOW_PRESETS,
+  type BorderRadiusConfig,
+  type BorderRadiusPresetName,
   type ExportConfig,
   type ImageFormat,
   type PresetName,
   type ShadowConfig,
   type StageTheme,
+  type ToolId,
 } from '../lib/types';
 
 interface NumericControlPair {
@@ -45,17 +59,13 @@ function createSampleScreenshotFile(): Promise<File> {
       return;
     }
 
-    // Card base com cantos arredondados
+    // Card base retangular para evidenciar o arredondamento de bordas ao testar
     sCtx.fillStyle = '#ffffff';
-    sCtx.beginPath();
-    sCtx.roundRect(0, 0, 640, 360, 12);
-    sCtx.fill();
+    sCtx.fillRect(0, 0, 640, 360);
 
     // Barra superior de janela
     sCtx.fillStyle = '#f3f4f6';
-    sCtx.beginPath();
-    sCtx.roundRect(0, 0, 640, 44, [12, 12, 0, 0]);
-    sCtx.fill();
+    sCtx.fillRect(0, 0, 640, 44);
 
     // Três botões da janela
     const dots = [
@@ -113,9 +123,7 @@ function createSampleScreenshotFile(): Promise<File> {
     // Borda sutil do print
     sCtx.strokeStyle = '#d1d5db';
     sCtx.lineWidth = 1;
-    sCtx.beginPath();
-    sCtx.roundRect(0.5, 0.5, 639, 359, 12);
-    sCtx.stroke();
+    sCtx.strokeRect(0.5, 0.5, 639, 359);
 
     sampleCanvas.toBlob((blob) => {
       if (!blob) {
@@ -155,15 +163,24 @@ export function initImagePolisher(): void {
   const downloadActionLabel = document.getElementById('download-action-label');
   const downloadFormatLabel = document.getElementById('download-format-label');
 
+  const footerSingleInfo = document.getElementById('footer-single-info');
+  const footerStatusText = document.getElementById('footer-status-text');
   const batchQueueBar = document.getElementById('batch-queue-bar');
   const batchCountLabel = document.getElementById('batch-count-label');
   const batchQueueList = document.getElementById('batch-queue-list');
   const btnBatchAdd = document.getElementById('btn-batch-add') as HTMLButtonElement | null;
   const btnBatchClear = document.getElementById('btn-batch-clear') as HTMLButtonElement | null;
 
-  const btnToolShadow = document.getElementById('btn-tool-shadow') as HTMLButtonElement | null;
+  const toolRail = document.getElementById('tool-rail');
   const toolPropertiesPanel = document.getElementById('tool-properties-panel');
+  const toolPanelInner = document.getElementById('tool-panel-inner');
+  const toolPaneStack = document.getElementById('tool-pane-stack');
   const activePresetLabel = document.getElementById('active-preset-label');
+  const activeRadiusPresetLabel = document.getElementById('active-radius-preset-label');
+  const radiusMixedHint = document.getElementById('radius-mixed-hint');
+  const btnSyncCorners = document.getElementById('btn-sync-corners') as HTMLButtonElement | null;
+  const radiusAllRange = document.getElementById('radiusAll') as HTMLInputElement | null;
+  const radiusAllNumber = document.getElementById('numRadiusAll') as HTMLInputElement | null;
 
   const qualityFieldset = document.getElementById('quality-control-wrapper');
   const qualityRange = document.getElementById('quality') as HTMLInputElement | null;
@@ -248,6 +265,7 @@ export function initImagePolisher(): void {
   }
 
   const shadowState: ShadowConfig = { ...SHADOW_PRESETS.medio };
+  const borderRadiusState: BorderRadiusConfig = { ...BORDER_RADIUS_PRESETS.nenhum };
   const exportState: ExportConfig = {
     format: 'image/png',
     quality: 0.88,
@@ -268,6 +286,23 @@ export function initImagePolisher(): void {
     const numEl = document.getElementById(`num${capKey}`) as HTMLInputElement | null;
     if (rangeEl && numEl) {
       controlPairs[key] = { range: rangeEl, number: numEl };
+    }
+  }
+
+  const cornerIdMap: Record<keyof BorderRadiusConfig, { rangeId: string; numberId: string }> = {
+    topLeft: { rangeId: 'radiusTL', numberId: 'numRadiusTL' },
+    topRight: { rangeId: 'radiusTR', numberId: 'numRadiusTR' },
+    bottomRight: { rangeId: 'radiusBR', numberId: 'numRadiusBR' },
+    bottomLeft: { rangeId: 'radiusBL', numberId: 'numRadiusBL' },
+  };
+  const cornerKeys = Object.keys(cornerIdMap) as (keyof BorderRadiusConfig)[];
+  const cornerPairs = {} as Record<keyof BorderRadiusConfig, NumericControlPair>;
+  for (const key of cornerKeys) {
+    const { rangeId, numberId } = cornerIdMap[key];
+    const rangeEl = document.getElementById(rangeId) as HTMLInputElement | null;
+    const numEl = document.getElementById(numberId) as HTMLInputElement | null;
+    if (rangeEl && numEl) {
+      cornerPairs[key] = { range: rangeEl, number: numEl };
     }
   }
 
@@ -311,6 +346,26 @@ export function initImagePolisher(): void {
     }
   }
 
+  const RADIUS_PRESET_LABELS: Record<BorderRadiusPresetName, string> = {
+    nenhum: 'Nenhum',
+    sutil: 'Sutil',
+    medio: 'Médio',
+    forte: 'Forte',
+  };
+
+  function highlightActiveRadiusPreset(activePreset: BorderRadiusPresetName | null): void {
+    const presetButtons = document.querySelectorAll<HTMLButtonElement>('[data-radius-preset]');
+    presetButtons.forEach((btn) => {
+      const isMatch = btn.dataset.radiusPreset === activePreset;
+      btn.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
+    });
+    if (activeRadiusPresetLabel) {
+      activeRadiusPresetLabel.textContent = activePreset
+        ? RADIUS_PRESET_LABELS[activePreset]
+        : 'Personalizado';
+    }
+  }
+
   function scheduleSizeEstimation(): void {
     const activeItem = getActiveItem();
     if (!activeItem || !canvas) return;
@@ -329,7 +384,13 @@ export function initImagePolisher(): void {
       const current = getActiveItem();
       if (!current || (current.gifFrames && current.gifFrames.length > 1)) return;
       try {
-        const blob = await encodeCanvasToBlob(canvas, current.image, shadowState, exportState);
+        const blob = await encodeCanvasToBlob(
+          canvas,
+          current.image,
+          shadowState,
+          exportState,
+          borderRadiusState
+        );
         const formattedOut = formatByteSize(blob.size);
         const formatMeta = FORMAT_OPTIONS.find((f) => f.mime === exportState.format);
         const extUpper = (formatMeta?.extension ?? 'png').toUpperCase();
@@ -359,7 +420,9 @@ export function initImagePolisher(): void {
         ? frames[gifFrameIndex % frames.length]!.canvas
         : activeItem.image;
 
-    const dims = renderShadowCanvas(canvas, source, shadowState);
+    const dims = renderShadowCanvas(canvas, source, shadowState, {
+      borderRadius: borderRadiusState,
+    });
 
     if (dimensionsBadge) {
       dimensionsBadge.textContent = `${activeItem.width}×${activeItem.height} → ${dims.width}×${dims.height} px`;
@@ -423,21 +486,114 @@ export function initImagePolisher(): void {
     renderCurrent();
   }
 
+  function syncRadiusInputsFromState(): void {
+    for (const key of cornerKeys) {
+      const pair = cornerPairs[key];
+      if (!pair) continue;
+      const val = borderRadiusState[key];
+      pair.range.value = String(Math.min(120, val));
+      pair.number.value = String(val);
+      updateRangeProgressFallback(pair.range);
+    }
+
+    const { topLeft, topRight, bottomRight, bottomLeft } = borderRadiusState;
+    const allEqual =
+      topLeft === topRight && topLeft === bottomRight && topLeft === bottomLeft;
+
+    radiusMixedHint?.classList.toggle('hidden', allEqual);
+
+    if (radiusAllRange && radiusAllNumber) {
+      const summaryVal = allEqual
+        ? topLeft
+        : Math.max(topLeft, topRight, bottomRight, bottomLeft);
+      radiusAllRange.value = String(Math.min(120, summaryVal));
+      radiusAllNumber.value = String(summaryVal);
+      updateRangeProgressFallback(radiusAllRange);
+    }
+
+    highlightActiveRadiusPreset(detectBorderRadiusPreset(borderRadiusState));
+  }
+
+  function applyBorderRadiusPreset(presetName: BorderRadiusPresetName): void {
+    const preset = BORDER_RADIUS_PRESETS[presetName];
+    Object.assign(borderRadiusState, preset);
+    syncRadiusInputsFromState();
+    renderCurrent();
+  }
+
+  let scrollHintObserver: IntersectionObserver | null = null;
+
+  function updateScrollHintFallback(): void {
+    scrollHintObserver?.disconnect();
+    scrollHintObserver = null;
+    if (!batchQueueList) return;
+
+    batchQueueList.classList.remove('more-start', 'more-end');
+
+    if (
+      typeof window === 'undefined' ||
+      window.CSS?.supports?.('animation-timeline', 'scroll()') ||
+      typeof IntersectionObserver === 'undefined'
+    ) {
+      return;
+    }
+
+    const first = batchQueueList.firstElementChild;
+    const last = batchQueueList.lastElementChild;
+    if (!first || !last) return;
+
+    scrollHintObserver = new IntersectionObserver(
+      (entries) => {
+        for (const { target, intersectionRatio } of entries) {
+          if (target === first) {
+            batchQueueList.classList.toggle('more-start', intersectionRatio < 1);
+          }
+          if (target === last) {
+            batchQueueList.classList.toggle('more-end', intersectionRatio < 1);
+          }
+        }
+      },
+      { root: batchQueueList, threshold: 1, rootMargin: '1px' }
+    );
+
+    scrollHintObserver.observe(first);
+    if (last !== first) {
+      scrollHintObserver.observe(last);
+    }
+  }
+
   function renderBatchQueueUI(): void {
     if (downloadActionLabel) {
       downloadActionLabel.textContent =
         queue.length > 1 ? `Exportar (${queue.length})` : 'Exportar';
     }
 
+    if (btnBatchClear) {
+      btnBatchClear.hidden = queue.length === 0;
+    }
+
+    if (footerStatusText) {
+      footerStatusText.textContent =
+        queue.length === 1
+          ? '1 arquivo aberto — clique em Adicionar para montar um lote'
+          : 'Abra ou arraste múltiplos arquivos para editar e exportar em lote';
+    }
+
     if (!batchQueueBar || !batchQueueList) return;
 
     if (queue.length <= 1) {
-      batchQueueBar.classList.add('hidden');
+      if (footerSingleInfo) showAnimatedElement(footerSingleInfo);
+      batchQueueBar.hidden = true;
       batchQueueList.replaceChildren();
+      scrollHintObserver?.disconnect();
+      scrollHintObserver = null;
+      batchQueueList.classList.remove('more-start', 'more-end');
       return;
     }
 
-    batchQueueBar.classList.remove('hidden');
+    if (footerSingleInfo) footerSingleInfo.hidden = true;
+    showAnimatedElement(batchQueueBar);
+
     if (batchCountLabel) {
       batchCountLabel.textContent = `Lote (${queue.length})`;
     }
@@ -446,21 +602,45 @@ export function initImagePolisher(): void {
     queue.forEach((item, index) => {
       const isActive = index === activeIndex;
       const wrapper = document.createElement('div');
+      wrapper.setAttribute('role', 'listitem');
       wrapper.className = isActive
-        ? 'inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-lg text-xs font-medium border border-[var(--color-brand)] bg-[var(--brand-subtle)] text-[var(--color-brand)] shrink-0'
-        : 'inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-lg text-xs font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-main)] hover:border-[var(--border-strong)] shrink-0';
+        ? 'batch-item inline-flex items-center gap-1.5 pl-1.5 pr-1 py-1 rounded-lg text-xs font-medium border border-[var(--color-brand)] bg-[var(--brand-subtle)] text-[var(--color-brand)] shrink-0'
+        : 'batch-item inline-flex items-center gap-1.5 pl-1.5 pr-1 py-1 rounded-lg text-xs font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-main)] hover:border-[var(--border-strong)] shrink-0';
 
       const selectBtn = document.createElement('button');
       selectBtn.type = 'button';
-      selectBtn.className = 'max-w-[160px] truncate cursor-pointer text-left';
-      selectBtn.textContent = item.baseName;
+      selectBtn.className = 'inline-flex items-center gap-1.5 cursor-pointer text-left min-w-0';
       selectBtn.title = `${item.baseName} (${formatByteSize(item.originalBytes)})`;
+      if (isActive) {
+        selectBtn.setAttribute('aria-current', 'true');
+      }
+
+      const thumb = document.createElement('img');
+      thumb.src = item.thumbDataUrl;
+      thumb.alt = '';
+      thumb.className =
+        'w-6 h-6 rounded object-cover shrink-0 border border-[var(--border-color)] bg-[var(--bg-panel)]';
+
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'max-w-[130px] truncate text-left';
+      labelSpan.textContent = item.baseName;
+
+      selectBtn.append(thumb, labelSpan);
+
+      if (item.gifFrames && item.gifFrames.length > 1) {
+        const gifTag = document.createElement('span');
+        gifTag.className =
+          'text-[9px] font-mono uppercase px-1 py-0.5 rounded bg-[var(--bg-panel)] border border-[var(--border-color)] text-[var(--text-muted)] shrink-0';
+        gifTag.textContent = 'GIF';
+        selectBtn.appendChild(gifTag);
+      }
+
       selectBtn.addEventListener('click', () => selectQueueIndex(index));
 
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className =
-        'w-4 h-4 rounded flex items-center justify-center text-[11px] opacity-60 hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer';
+        'w-5 h-5 rounded flex items-center justify-center text-[12px] opacity-60 hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer shrink-0';
       removeBtn.textContent = '×';
       removeBtn.ariaLabel = `Remover ${item.baseName} do lote`;
       removeBtn.addEventListener('click', (e) => {
@@ -473,6 +653,15 @@ export function initImagePolisher(): void {
     });
 
     batchQueueList.replaceChildren(fragment);
+
+    const activeWrapper = batchQueueList.children[activeIndex] as HTMLElement | undefined;
+    activeWrapper?.scrollIntoView({
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+      inline: 'nearest',
+      block: 'nearest',
+    });
+
+    updateScrollHintFallback();
   }
 
   function clearWorkspace(): void {
@@ -528,13 +717,28 @@ export function initImagePolisher(): void {
 
   function removeQueueIndex(index: number): void {
     if (index < 0 || index >= queue.length) return;
+    const removedEl = batchQueueList?.children[index] as HTMLElement | undefined;
+    const hadFocus = Boolean(removedEl?.contains(document.activeElement));
+
     queue.splice(index, 1);
     if (queue.length === 0) {
       clearWorkspace();
+      if (hadFocus) btnBatchAdd?.focus();
       return;
     }
+
     const nextIndex = Math.min(activeIndex, queue.length - 1);
     selectQueueIndex(Math.max(0, nextIndex));
+
+    if (hadFocus) {
+      if (queue.length <= 1) {
+        btnBatchAdd?.focus();
+      } else {
+        const focusIdx = Math.min(index, queue.length - 1);
+        const targetBtn = batchQueueList?.children[focusIdx]?.querySelector('button');
+        targetBtn?.focus();
+      }
+    }
   }
 
   async function handleFilesSelection(
@@ -720,14 +924,174 @@ export function initImagePolisher(): void {
     });
   });
 
-  // Alternância do painel de propriedades pelo menu de ícones
-  btnToolShadow?.addEventListener('click', () => {
-    if (!toolPropertiesPanel) return;
-    const isCurrentlyOpen = btnToolShadow.getAttribute('aria-pressed') === 'true';
-    const nextOpen = !isCurrentlyOpen;
-    btnToolShadow.setAttribute('aria-pressed', nextOpen ? 'true' : 'false');
-    toolPropertiesPanel.classList.toggle('hidden', !nextOpen);
+  // Bindings de Raio Geral e Cantos Individuais de Bordas
+  const clampRadiusInput = (raw: number): number =>
+    Math.min(MAX_BORDER_RADIUS, Math.max(0, Math.round(raw)));
+
+  if (radiusAllRange && radiusAllNumber) {
+    const onAllRadiusUpdate = (source: HTMLInputElement) => {
+      const parsed = parseFloat(source.value);
+      if (Number.isNaN(parsed)) return;
+      const val = clampRadiusInput(parsed);
+      borderRadiusState.topLeft = val;
+      borderRadiusState.topRight = val;
+      borderRadiusState.bottomRight = val;
+      borderRadiusState.bottomLeft = val;
+      syncRadiusInputsFromState();
+      renderCurrent();
+    };
+    radiusAllRange.addEventListener('input', () => onAllRadiusUpdate(radiusAllRange));
+    radiusAllNumber.addEventListener('input', () => onAllRadiusUpdate(radiusAllNumber));
+  }
+
+  for (const key of cornerKeys) {
+    const pair = cornerPairs[key];
+    if (!pair) continue;
+
+    const onCornerUpdate = (source: HTMLInputElement) => {
+      const parsed = parseFloat(source.value);
+      if (Number.isNaN(parsed)) return;
+      borderRadiusState[key] = clampRadiusInput(parsed);
+      syncRadiusInputsFromState();
+      renderCurrent();
+    };
+
+    pair.range.addEventListener('input', () => onCornerUpdate(pair.range));
+    pair.number.addEventListener('input', () => onCornerUpdate(pair.number));
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('[data-radius-preset]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const preset = btn.dataset.radiusPreset as BorderRadiusPresetName | undefined;
+      if (preset && preset in BORDER_RADIUS_PRESETS) {
+        applyBorderRadiusPreset(preset);
+      }
+    });
   });
+
+  btnSyncCorners?.addEventListener('click', () => {
+    const base =
+      borderRadiusState.topLeft > 0
+        ? borderRadiusState.topLeft
+        : Math.max(
+            borderRadiusState.topLeft,
+            borderRadiusState.topRight,
+            borderRadiusState.bottomRight,
+            borderRadiusState.bottomLeft
+          );
+    borderRadiusState.topLeft = base;
+    borderRadiusState.topRight = base;
+    borderRadiusState.bottomRight = base;
+    borderRadiusState.bottomLeft = base;
+    syncRadiusInputsFromState();
+    renderCurrent();
+  });
+
+  // Controlador de ferramenta ativa e animações (abrir / fechar / trocar de opção)
+  const TOOL_ORDER: ToolId[] = ['shadow', 'corners'];
+  let activeTool: ToolId | null = 'shadow';
+  let panelTransitionGen = 0;
+  let paneSwitchGen = 0;
+
+  const toolButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-tool]'));
+  const toolPanes = Array.from(document.querySelectorAll<HTMLElement>('[data-tool-pane]'));
+
+  function syncRailAria(tool: ToolId | null): void {
+    if (toolRail) {
+      toolRail.dataset.panelOpen = tool !== null ? 'true' : 'false';
+    }
+    for (const btn of toolButtons) {
+      const isSelected = btn.dataset.tool === tool;
+      btn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+      btn.setAttribute('aria-expanded', isSelected ? 'true' : 'false');
+    }
+  }
+
+  function setImmediatePane(targetTool: ToolId): void {
+    for (const pane of toolPanes) {
+      pane.removeAttribute('data-leaving');
+      pane.removeAttribute('aria-hidden');
+      pane.hidden = pane.dataset.toolPane !== targetTool;
+    }
+  }
+
+  async function switchToolPane(fromTool: ToolId, toTool: ToolId): Promise<void> {
+    if (fromTool === toTool || !toolPaneStack) return;
+
+    const leavingPane = toolPanes.find((p) => p.dataset.toolPane === fromTool);
+    const enteringPane = toolPanes.find((p) => p.dataset.toolPane === toTool);
+    if (!enteringPane) return;
+
+    const gen = ++paneSwitchGen;
+    const dir = TOOL_ORDER.indexOf(toTool) > TOOL_ORDER.indexOf(fromTool) ? 'down' : 'up';
+    toolPaneStack.dataset.switchDir = dir;
+
+    for (const pane of toolPanes) {
+      if (pane !== leavingPane && pane !== enteringPane) {
+        pane.removeAttribute('data-leaving');
+        pane.removeAttribute('aria-hidden');
+        pane.hidden = true;
+      }
+    }
+
+    if (leavingPane) {
+      leavingPane.hidden = false;
+      leavingPane.setAttribute('data-leaving', '');
+      leavingPane.setAttribute('aria-hidden', 'true');
+    }
+
+    enteringPane.removeAttribute('data-leaving');
+    enteringPane.removeAttribute('aria-hidden');
+    enteringPane.hidden = false;
+
+    if (leavingPane) {
+      await waitForElementAnimations(leavingPane, 260);
+      if (gen === paneSwitchGen && leavingPane.hasAttribute('data-leaving')) {
+        leavingPane.hidden = true;
+        leavingPane.removeAttribute('data-leaving');
+        leavingPane.removeAttribute('aria-hidden');
+      }
+    }
+  }
+
+  function handleToolSelect(toolId: ToolId): void {
+    if (!toolPropertiesPanel) return;
+
+    if (activeTool === toolId) {
+      activeTool = null;
+      const gen = ++panelTransitionGen;
+      syncRailAria(null);
+      void hideAnimatedElement(toolPropertiesPanel, {
+        extraTarget: toolPanelInner,
+        isCurrent: () => gen === panelTransitionGen,
+      });
+      return;
+    }
+
+    if (activeTool === null) {
+      activeTool = toolId;
+      panelTransitionGen++;
+      paneSwitchGen++;
+      setImmediatePane(toolId);
+      syncRailAria(toolId);
+      showAnimatedElement(toolPropertiesPanel);
+      return;
+    }
+
+    const prev = activeTool;
+    activeTool = toolId;
+    syncRailAria(toolId);
+    void switchToolPane(prev, toolId);
+  }
+
+  for (const btn of toolButtons) {
+    btn.addEventListener('click', () => {
+      const toolId = btn.dataset.tool as ToolId | undefined;
+      if (toolId && TOOL_ORDER.includes(toolId)) {
+        handleToolSelect(toolId);
+      }
+    });
+  }
 
   // Bindings de Presets
   document.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach((btn) => {
@@ -863,6 +1227,19 @@ export function initImagePolisher(): void {
     showToast('Fila de imagens limpa');
   });
 
+  // Permite rolar horizontalmente a fila do rodapé usando a roda do mouse
+  batchQueueList?.addEventListener(
+    'wheel',
+    (e) => {
+      if (batchQueueList.scrollWidth <= batchQueueList.clientWidth) return;
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+        batchQueueList.scrollLeft += e.deltaY;
+      }
+    },
+    { passive: false }
+  );
+
   // Drag & Drop na página inteira e no dropzone
   const setDropHighlight = (active: boolean) => {
     const targets = [dropzoneLabel, stageWrapper].filter(Boolean) as HTMLElement[];
@@ -907,6 +1284,7 @@ export function initImagePolisher(): void {
     panX = 0;
     panY = 0;
     applyPreset('medio');
+    applyBorderRadiusPreset('nenhum');
     showToast('Ajustes e enquadramento restaurados');
   });
 
@@ -956,11 +1334,16 @@ export function initImagePolisher(): void {
         btnDownload.disabled = true;
         try {
           showToast(`Codificando GIF (${single.gifFrames.length} frames)...`);
-          const blob = await encodeAnimatedGifToBlob(single.gifFrames, shadowState, (cur, total) => {
-            if (cur === total || cur % 10 === 0) {
-              showToast(`Codificando GIF (${cur}/${total})...`);
-            }
-          });
+          const blob = await encodeAnimatedGifToBlob(
+            single.gifFrames,
+            shadowState,
+            (cur, total) => {
+              if (cur === total || cur % 10 === 0) {
+                showToast(`Codificando GIF (${cur}/${total})...`);
+              }
+            },
+            borderRadiusState
+          );
           triggerBlobDownload(blob, single.baseName, 'image/gif');
           showToast(`GIF exportado (${formatByteSize(blob.size)})`);
         } catch (err) {
@@ -973,7 +1356,13 @@ export function initImagePolisher(): void {
       }
 
       try {
-        const blob = await encodeCanvasToBlob(canvas, single.image, shadowState, exportState);
+        const blob = await encodeCanvasToBlob(
+          canvas,
+          single.image,
+          shadowState,
+          exportState,
+          borderRadiusState
+        );
         triggerBlobDownload(blob, single.baseName, exportState.format);
         showToast(`Exportado em ${extUpper} (${formatByteSize(blob.size)})`);
       } catch (err) {
@@ -992,11 +1381,24 @@ export function initImagePolisher(): void {
         showToast(`Exportando ${i + 1}/${queue.length}: ${item.baseName}...`);
 
         if (item.gifFrames && item.gifFrames.length > 1) {
-          const blob = await encodeAnimatedGifToBlob(item.gifFrames, shadowState);
+          const blob = await encodeAnimatedGifToBlob(
+            item.gifFrames,
+            shadowState,
+            undefined,
+            borderRadiusState
+          );
           triggerBlobDownload(blob, item.baseName, 'image/gif');
         } else {
-          renderShadowCanvas(offscreenCanvas, item.image, shadowState);
-          const blob = await encodeCanvasToBlob(offscreenCanvas, item.image, shadowState, exportState);
+          renderShadowCanvas(offscreenCanvas, item.image, shadowState, {
+            borderRadius: borderRadiusState,
+          });
+          const blob = await encodeCanvasToBlob(
+            offscreenCanvas,
+            item.image,
+            shadowState,
+            exportState,
+            borderRadiusState
+          );
           triggerBlobDownload(blob, item.baseName, exportState.format);
         }
 
@@ -1061,5 +1463,7 @@ export function initImagePolisher(): void {
 
   // Inicializa estado padrão
   applyPreset('medio');
+  applyBorderRadiusPreset('nenhum');
   updateFormatUI();
+  syncRailAria('shadow');
 }

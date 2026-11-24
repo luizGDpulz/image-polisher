@@ -1,6 +1,12 @@
 import { decodeAnimatedGif, type DecodedGifFrame } from './gif-engine';
 import { renderShadowCanvas } from './shadow-engine';
-import { FORMAT_OPTIONS, type ExportConfig, type ImageFormat, type ShadowConfig } from './types';
+import {
+  FORMAT_OPTIONS,
+  type BorderRadiusConfig,
+  type ExportConfig,
+  type ImageFormat,
+  type ShadowConfig,
+} from './types';
 
 export interface LoadedImageResult {
   image: HTMLImageElement;
@@ -8,7 +14,38 @@ export interface LoadedImageResult {
   originalBytes: number;
   width: number;
   height: number;
+  thumbDataUrl: string;
   gifFrames?: DecodedGifFrame[];
+}
+
+/**
+ * Gera uma miniatura compacta (Data URL) antes da revogação do ObjectURL para uso no rodapé de lote.
+ */
+function createThumbnailDataUrl(img: HTMLImageElement, maxDim = 64): string {
+  const srcW = img.naturalWidth || 1;
+  const srcH = img.naturalHeight || 1;
+  const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+  const targetW = Math.max(1, Math.round(srcW * scale));
+  const targetH = Math.max(1, Math.round(srcH * scale));
+
+  const thumbCanvas = document.createElement('canvas');
+  thumbCanvas.width = targetW;
+  thumbCanvas.height = targetH;
+  const tCtx = thumbCanvas.getContext('2d');
+  if (tCtx) {
+    tCtx.drawImage(img, 0, 0, targetW, targetH);
+  }
+
+  try {
+    const webpUrl = thumbCanvas.toDataURL('image/webp', 0.78);
+    if (webpUrl.startsWith('data:image/webp')) {
+      return webpUrl;
+    }
+  } catch {
+    // Fallback para PNG caso o ambiente não suporte data URL WebP
+  }
+
+  return thumbCanvas.toDataURL('image/png');
 }
 
 /**
@@ -55,6 +92,7 @@ export async function loadImageFromFile(file: File): Promise<LoadedImageResult> 
     originalBytes: file.size,
     width: gifDecoded ? gifDecoded.width : img.naturalWidth,
     height: gifDecoded ? gifDecoded.height : img.naturalHeight,
+    thumbDataUrl: createThumbnailDataUrl(img),
     gifFrames: gifDecoded?.frames,
   };
 }
@@ -138,7 +176,8 @@ export function encodeCanvasToBlob(
   displayCanvas: HTMLCanvasElement,
   source: HTMLImageElement | HTMLCanvasElement,
   shadowConfig: ShadowConfig,
-  exportConfig: ExportConfig
+  exportConfig: ExportConfig,
+  borderRadius?: BorderRadiusConfig
 ): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const formatMeta = FORMAT_OPTIONS.find((f) => f.mime === exportConfig.format);
@@ -147,7 +186,10 @@ export function encodeCanvasToBlob(
     let targetCanvas = displayCanvas;
     if (needsSolidBackground) {
       targetCanvas = document.createElement('canvas');
-      renderShadowCanvas(targetCanvas, source, shadowConfig, { fillBackground: '#ffffff' });
+      renderShadowCanvas(targetCanvas, source, shadowConfig, {
+        fillBackground: '#ffffff',
+        borderRadius,
+      });
     }
 
     const qualityArg = formatMeta?.supportsLossyQuality

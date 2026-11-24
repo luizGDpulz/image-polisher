@@ -1,4 +1,9 @@
-import type { ShadowConfig } from './types';
+import {
+  createRoundedSourceCanvas,
+  hasActiveBorderRadius,
+  sanitizeBorderRadiusConfig,
+} from './border-radius';
+import type { BorderRadiusConfig, ShadowConfig } from './types';
 
 export interface SmartPadding {
   padTop: number;
@@ -10,6 +15,11 @@ export interface SmartPadding {
 export interface RenderDimensions extends SmartPadding {
   width: number;
   height: number;
+}
+
+export interface RenderOptions {
+  fillBackground?: string;
+  borderRadius?: BorderRadiusConfig;
 }
 
 const BLUR_SPREAD_FACTOR = 1.35;
@@ -64,9 +74,10 @@ export function renderShadowCanvas(
   canvas: HTMLCanvasElement,
   source: HTMLImageElement | HTMLCanvasElement,
   rawConfig: ShadowConfig,
-  options?: { fillBackground?: string }
+  options?: RenderOptions
 ): RenderDimensions {
   const config = sanitizeShadowConfig(rawConfig);
+  const radiusConfig = sanitizeBorderRadiusConfig(options?.borderRadius);
   const { padTop, padRight, padBottom, padLeft } = calculateSmartPadding(config);
   const sourceWidth = source instanceof HTMLImageElement ? source.naturalWidth : source.width;
   const sourceHeight = source instanceof HTMLImageElement ? source.naturalHeight : source.height;
@@ -81,6 +92,10 @@ export function renderShadowCanvas(
     return { width, height, padTop, padRight, padBottom, padLeft };
   }
 
+  const drawTarget = hasActiveBorderRadius(radiusConfig)
+    ? createRoundedSourceCanvas(source, sourceWidth, sourceHeight, radiusConfig)
+    : source;
+
   ctx.save();
   ctx.clearRect(0, 0, width, height);
 
@@ -89,12 +104,19 @@ export function renderShadowCanvas(
     ctx.fillRect(0, 0, width, height);
   }
 
-  ctx.shadowColor = `rgba(0, 0, 0, ${config.opacity})`;
-  ctx.shadowBlur = config.blur;
-  ctx.shadowOffsetX = config.offsetX;
-  ctx.shadowOffsetY = config.offsetY;
+  if (config.opacity > 0) {
+    ctx.shadowColor = `rgba(0, 0, 0, ${config.opacity})`;
+    ctx.shadowBlur = config.blur;
+    ctx.shadowOffsetX = config.offsetX;
+    ctx.shadowOffsetY = config.offsetY;
+  } else {
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+  }
 
-  ctx.drawImage(source, padLeft, padTop);
+  ctx.drawImage(drawTarget, padLeft, padTop);
   ctx.restore();
 
   return { width, height, padTop, padRight, padBottom, padLeft };
