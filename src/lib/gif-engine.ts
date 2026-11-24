@@ -1,7 +1,7 @@
 import { GIFEncoder, applyPalette, quantize } from 'gifenc';
 import { decompressFrames, parseGIF } from 'gifuct-js';
 import { renderShadowCanvas } from './shadow-engine';
-import type { ShadowConfig } from './types';
+import type { BorderRadiusConfig, ShadowConfig } from './types';
 
 export interface DecodedGifFrame {
   canvas: HTMLCanvasElement;
@@ -95,7 +95,8 @@ export async function decodeAnimatedGif(file: File): Promise<DecodedGifResult | 
 export async function encodeAnimatedGifToBlob(
   frames: DecodedGifFrame[],
   shadowConfig: ShadowConfig,
-  onProgress?: (current: number, total: number) => void
+  onProgress?: (current: number, total: number) => void,
+  borderRadius?: BorderRadiusConfig
 ): Promise<Blob> {
   const gif = GIFEncoder();
   const frameCanvas = document.createElement('canvas');
@@ -104,6 +105,7 @@ export async function encodeAnimatedGifToBlob(
     const frame = frames[i]!;
     const { width, height } = renderShadowCanvas(frameCanvas, frame.canvas, shadowConfig, {
       fillBackground: '#ffffff',
+      borderRadius,
     });
 
     const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
