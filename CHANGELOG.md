@@ -8,6 +8,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Não lançado]
 
 ### Adicionado
+- Opção **Nenhum** nos estilos predefinidos de sombra para remover a sombra da imagem (mantendo **Médio** como padrão inicial e no reset).
 - Módulo de arredondamento de bordas (`Bordas` no rail de ferramentas) com presets rápidos (`Nenhum`, `Sutil`, `Médio`, `Forte`), controle de raio geral, cantos individuais na gaveta colapsável e suporte completo em preview, cópia, exportação multi-formato e GIFs animados.
 - Animações fluidas de abrir, fechar e trocar de opção no painel de ferramentas (com indicador deslizante no rail e respeito a `prefers-reduced-motion`).
 - Rodapé flutuante com status contextual, miniaturas dos arquivos abertos em lote, scroll horizontal com fade nas extremidades e ações rápidas (`+ Adicionar` / `Limpar`).
