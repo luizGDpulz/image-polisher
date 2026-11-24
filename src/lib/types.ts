@@ -2,7 +2,7 @@ export type ImageFormat = 'image/png' | 'image/webp' | 'image/jpeg' | 'image/avi
 
 export type ToolId = 'shadow' | 'corners';
 
-export type PresetName = 'leve' | 'medio' | 'forte' | 'flutuante';
+export type PresetName = 'nenhum' | 'leve' | 'medio' | 'forte' | 'flutuante';
 
 export type BorderRadiusPresetName = 'nenhum' | 'sutil' | 'medio' | 'forte';
 
@@ -68,6 +68,13 @@ export const FORMAT_OPTIONS: readonly FormatOption[] = [
 ] as const;
 
 export const SHADOW_PRESETS: Record<PresetName, ShadowConfig> = {
+  nenhum: {
+    offsetX: 0,
+    offsetY: 0,
+    blur: 0,
+    opacity: 0,
+    extraPadding: 0,
+  },
   leve: {
     offsetX: 0,
     offsetY: 4,
