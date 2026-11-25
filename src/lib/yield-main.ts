@@ -1,3 +1,5 @@
+import type { AnimationFrameChunk, AnimationFrameSource } from './types';
+
 interface SchedulerLike {
   yield?: () => Promise<void>;
 }
@@ -22,5 +24,26 @@ export function yieldToMain(): Promise<void> {
 export function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) {
     throw new DOMException('Exportação cancelada pelo usuário.', 'AbortError');
+  }
+}
+
+/**
+ * Itera de forma uniforme sobre frames pré-decodificados ou fontes por streaming.
+ */
+export async function* iterateAnimationSource(
+  source: AnimationFrameChunk[] | AnimationFrameSource,
+  signal?: AbortSignal
+): AsyncIterable<AnimationFrameChunk> {
+  if (Array.isArray(source)) {
+    for (const frame of source) {
+      throwIfAborted(signal);
+      yield frame;
+    }
+    return;
+  }
+
+  for await (const frame of source.iterateFrames(signal)) {
+    throwIfAborted(signal);
+    yield frame;
   }
 }

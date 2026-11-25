@@ -2,12 +2,11 @@ import { GIFEncoder, applyPalette, quantize } from 'gifenc';
 import { decompressFrames, parseGIF } from 'gifuct-js';
 import { renderShadowCanvas } from './shadow-engine';
 import type {
-  AnimationFrameChunk,
   AnimationFrameSource,
   BorderRadiusConfig,
   ShadowConfig,
 } from './types';
-import { throwIfAborted, yieldToMain } from './yield-main';
+import { iterateAnimationSource, throwIfAborted, yieldToMain } from './yield-main';
 
 export interface DecodedGifFrame {
   canvas: HTMLCanvasElement;
@@ -213,24 +212,6 @@ export async function decodeAnimatedGif(file: File): Promise<DecodedGifResult | 
   }
 
   return { frames, width, height };
-}
-
-async function* iterateAnimationSource(
-  source: DecodedGifFrame[] | AnimationFrameSource,
-  signal?: AbortSignal
-): AsyncIterable<AnimationFrameChunk> {
-  if (Array.isArray(source)) {
-    for (const frame of source) {
-      throwIfAborted(signal);
-      yield frame;
-    }
-    return;
-  }
-
-  for await (const frame of source.iterateFrames(signal)) {
-    throwIfAborted(signal);
-    yield frame;
-  }
 }
 
 /**
