@@ -616,8 +616,90 @@ details:not([open])::details-content {
   opacity: 0;
 }
 
-#btn-batch-clear[hidden] {
+#btn-batch-clear[hidden],
+#btn-tool-video[hidden],
+#playback-controls-group[hidden],
+#export-progress-card[hidden],
+#static-format-section[hidden],
+#animated-format-section[hidden],
+#gif-dithering-wrapper[hidden],
+#video-frames-warning[hidden] {
   display: none;
+}
+
+#static-format-section:not([hidden]) + #animated-format-section {
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.polisher-warning-box {
+  background-color: #fff9db;
+  color: #9c5200;
+  border: 1px solid #ffe066;
+}
+
+@supports (color: light-dark(white, black)) {
+  .polisher-warning-box {
+    background-color: light-dark(#fff9db, rgba(230, 119, 0, 0.14));
+    color: light-dark(#9c5200, #ffd43b);
+    border-color: light-dark(#ffe066, rgba(255, 212, 59, 0.28));
+  }
+}
+
+/* Barra de progresso nativa (guia modern-web-guidance: progress) */
+progress.polisher-progress {
+  appearance: none;
+  border: 0 solid;
+  overflow: clip;
+  border-radius: 999px;
+  background: var(--border-color);
+  container-type: inline-size;
+  --progress-bar-indeterminate-size: 32%;
+  --progress-bar-indeterminate-animation-duration: 1.5s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  progress.polisher-progress {
+    --progress-bar-indeterminate-animation-duration: 10s;
+  }
+}
+
+progress.polisher-progress::-webkit-progress-bar {
+  background: transparent;
+}
+
+progress.polisher-progress::-webkit-progress-value {
+  background: var(--color-brand);
+  border-radius: 999px;
+  transition: inline-size 0.15s ease-out;
+}
+
+progress.polisher-progress::-moz-progress-bar {
+  background: var(--color-brand);
+  border-radius: 999px;
+  transition: inline-size 0.15s ease-out;
+}
+
+progress.polisher-progress:indeterminate::-webkit-progress-value {
+  animation: progress-bar-indeterminate var(--progress-bar-indeterminate-animation-duration) infinite linear;
+}
+
+progress.polisher-progress:indeterminate::-moz-progress-bar {
+  animation: progress-bar-indeterminate var(--progress-bar-indeterminate-animation-duration) infinite linear;
+}
+
+@keyframes progress-bar-indeterminate {
+  from,
+  to {
+    inline-size: var(--progress-bar-indeterminate-size);
+    margin-right: auto;
+  }
+  from {
+    translate: -100%;
+  }
+  to {
+    translate: 100cqi;
+  }
 }
 
 .batch-scroller {
