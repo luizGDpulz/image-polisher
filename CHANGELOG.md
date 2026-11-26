@@ -16,6 +16,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ### Alterado
 - **Qualidade de GIF animado:** adicionado dithering Floyd-Steinberg com cache RGB565 (seleção `Alta` / `Rápida` no popover de saída), streaming via `AnimationFrameSource`, opção de repetição (`Loop infinito` / `1 vez`) e cedência cooperativa à thread principal (`scheduler.yield()`) (#17).
 - **Performance na importação de arquivos:** decodificação LZW de GIFs movida para Web Worker dedicado (`gif-decode.worker.ts`) com transferência zero-copy, eliminação de decodificação dupla em GIF/WebP animado e otimização de Drag & Drop por contador único (#21).
+- **Visibilidade de arquivo aberto no rodapé:** o arquivo carregado passa a ser exibido com miniatura, badge de formato e botão de remoção na barra inferior mesmo quando aberto sozinho (#20).
 
 ## [1.2.0] - 2026-11-24
 

@@ -914,14 +914,12 @@ export function initImagePolisher(): void {
 
     if (footerStatusText) {
       footerStatusText.textContent =
-        queue.length === 1
-          ? '1 arquivo aberto — clique em Adicionar para montar um lote'
-          : 'Abra ou arraste imagens, GIFs ou vídeos para editar e exportar em lote';
+        'Abra ou arraste imagens, GIFs ou vídeos para editar e exportar em lote';
     }
 
     if (!batchQueueBar || !batchQueueList) return;
 
-    if (queue.length <= 1) {
+    if (queue.length === 0) {
       if (footerSingleInfo) showAnimatedElement(footerSingleInfo);
       batchQueueBar.hidden = true;
       batchQueueList.replaceChildren();
@@ -935,7 +933,8 @@ export function initImagePolisher(): void {
     showAnimatedElement(batchQueueBar);
 
     if (batchCountLabel) {
-      batchCountLabel.textContent = `Lote (${queue.length})`;
+      batchCountLabel.textContent =
+        queue.length === 1 ? 'Arquivo (1)' : `Lote (${queue.length})`;
     }
 
     const fragment = document.createDocumentFragment();
@@ -1222,12 +1221,12 @@ export function initImagePolisher(): void {
     selectQueueIndex(Math.max(0, nextIndex));
 
     if (hadFocus) {
-      if (queue.length <= 1) {
-        btnBatchAdd?.focus();
+      const focusIdx = Math.min(index, queue.length - 1);
+      const targetBtn = batchQueueList?.children[focusIdx]?.querySelector('button');
+      if (targetBtn) {
+        targetBtn.focus();
       } else {
-        const focusIdx = Math.min(index, queue.length - 1);
-        const targetBtn = batchQueueList?.children[focusIdx]?.querySelector('button');
-        targetBtn?.focus();
+        btnBatchAdd?.focus();
       }
     }
   }

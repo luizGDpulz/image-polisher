@@ -2258,7 +2258,7 @@ import Layout from '../layouts/Layout.astro';
       aria-label="Rodapé de arquivos e fila em lote"
       class="floating-footer sticky bottom-3 lg:static z-30 shrink-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-panel)]/95 lg:bg-[var(--bg-panel)] backdrop-blur-md shadow-[0_6px_24px_rgba(0,0,0,0.06)] lg:shadow-[0_2px_10px_rgba(0,0,0,0.03)] px-3.5 py-2 flex items-center justify-between gap-3"
     >
-      <!-- Estado compacto (0 ou 1 arquivo) -->
+      <!-- Estado vazio (0 arquivos) -->
       <div
         id="footer-single-info"
         class="footer-slot flex-1 min-w-0 items-center gap-2 text-xs text-[var(--text-muted)]"
@@ -2284,12 +2284,12 @@ import Layout from '../layouts/Layout.astro';
         </span>
       </div>
 
-      <!-- Fila de Múltiplos Arquivos (exibida quando há 2+ arquivos) -->
+      <!-- Fila de Arquivos (exibida com 1+ arquivos abertos) -->
       <div
         id="batch-queue-bar"
         hidden
         class="footer-slot flex-1 min-w-0 items-center gap-2.5"
-        aria-label="Fila de imagens em lote"
+        aria-label="Fila de arquivos abertos"
       >
         <span
           id="batch-count-label"
