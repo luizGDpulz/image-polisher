@@ -1,51 +1,68 @@
 import { decodeAnimatedGif, type DecodedGifFrame } from './gif-engine';
 import { renderShadowCanvas } from './shadow-engine';
 import {
+  ANIMATED_FORMAT_OPTIONS,
+  DEFAULT_VIDEO_FPS,
   FORMAT_OPTIONS,
+  type AnimatedFormat,
   type BorderRadiusConfig,
   type ExportConfig,
   type ImageFormat,
+  type MediaKind,
   type ShadowConfig,
+  type VideoConfig,
 } from './types';
+import {
+  createThumbnailDataUrl,
+  isVideoFile,
+  loadVideoAsset,
+  sanitizeVideoConfig,
+  type LoadedVideoAsset,
+} from './video-engine';
+import { decodeAnimatedWebp } from './webp-engine';
+import { throwIfAborted } from './yield-main';
+
+export interface LoadMediaOptions {
+  signal?: AbortSignal;
+  onProgress?: (info: { fraction: number; detailText?: string }) => void;
+}
 
 export interface LoadedImageResult {
-  image: HTMLImageElement;
+  image: HTMLImageElement | HTMLCanvasElement;
   baseName: string;
   originalBytes: number;
   width: number;
   height: number;
   thumbDataUrl: string;
+  mediaKind: MediaKind;
   gifFrames?: DecodedGifFrame[];
+  videoAsset?: LoadedVideoAsset;
+  videoConfig?: VideoConfig;
 }
 
+const IMAGE_EXTENSIONS = [
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.webp',
+  '.avif',
+  '.gif',
+  '.bmp',
+  '.svg',
+  '.ico',
+] as const;
+
 /**
- * Gera uma miniatura compacta (Data URL) antes da revogação do ObjectURL para uso no rodapé de lote.
+ * Indica se o arquivo é uma mídia suportada (imagem, GIF, WebP ou vídeo).
  */
-function createThumbnailDataUrl(img: HTMLImageElement, maxDim = 64): string {
-  const srcW = img.naturalWidth || 1;
-  const srcH = img.naturalHeight || 1;
-  const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
-  const targetW = Math.max(1, Math.round(srcW * scale));
-  const targetH = Math.max(1, Math.round(srcH * scale));
-
-  const thumbCanvas = document.createElement('canvas');
-  thumbCanvas.width = targetW;
-  thumbCanvas.height = targetH;
-  const tCtx = thumbCanvas.getContext('2d');
-  if (tCtx) {
-    tCtx.drawImage(img, 0, 0, targetW, targetH);
+export function isSupportedMediaFile(file: File): boolean {
+  if (isVideoFile(file)) return true;
+  if (file.type.startsWith('image/')) return true;
+  if (!file.type || file.type === 'application/octet-stream') {
+    const lower = file.name.toLowerCase();
+    return IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext));
   }
-
-  try {
-    const webpUrl = thumbCanvas.toDataURL('image/webp', 0.78);
-    if (webpUrl.startsWith('data:image/webp')) {
-      return webpUrl;
-    }
-  } catch {
-    // Fallback para PNG caso o ambiente não suporte data URL WebP
-  }
-
-  return thumbCanvas.toDataURL('image/png');
+  return false;
 }
 
 /**
@@ -59,46 +76,155 @@ export function stripExtension(fileName: string): string {
   return raw === 'image' ? 'print-capturado' : raw;
 }
 
-/**
- * Carrega um objeto File de imagem em um HTMLImageElement pronto para desenho em Canvas.
- * Para GIFs animados, também decodifica todos os frames e delays.
- */
-export async function loadImageFromFile(file: File): Promise<LoadedImageResult> {
-  const isGif = file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif');
-  const gifPromise = isGif ? decodeAnimatedGif(file).catch(() => null) : Promise.resolve(null);
+function loadStaticImageElement(file: File, signal?: AbortSignal): Promise<HTMLImageElement> {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    throwIfAborted(signal);
 
-  const imgPromise = new Promise<HTMLImageElement>((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();
+    let settled = false;
+
+    const cleanup = () => {
+      img.onload = null;
+      img.onerror = null;
+      signal?.removeEventListener('abort', onAbort);
+    };
+
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      img.src = '';
+      URL.revokeObjectURL(objectUrl);
+      reject(new DOMException('Importação cancelada pelo usuário.', 'AbortError'));
+    };
 
     img.onload = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
       URL.revokeObjectURL(objectUrl);
       resolve(img);
     };
 
     img.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
       URL.revokeObjectURL(objectUrl);
       reject(new Error('Não foi possível decodificar a imagem selecionada.'));
     };
 
+    signal?.addEventListener('abort', onAbort, { once: true });
     img.src = objectUrl;
   });
+}
 
-  const [img, gifDecoded] = await Promise.all([imgPromise, gifPromise]);
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'AbortError';
+}
+
+/**
+ * Carrega uma mídia suportada (imagem estática, GIF animado, WebP animado ou vídeo)
+ * preparando frames decodificados ou asset de vídeo para preview e exportação sem
+ * decodificação dupla.
+ */
+export async function loadImageFromFile(
+  file: File,
+  options?: LoadMediaOptions
+): Promise<LoadedImageResult> {
+  const signal = options?.signal;
+  throwIfAborted(signal);
+
+  if (isVideoFile(file)) {
+    options?.onProgress?.({ fraction: 0.15, detailText: 'Carregando vídeo...' });
+    const videoAsset = await loadVideoAsset(file, signal);
+    options?.onProgress?.({ fraction: 1 });
+
+    const videoConfig = sanitizeVideoConfig(
+      {
+        fps: DEFAULT_VIDEO_FPS,
+        maxWidth: 0,
+        trimStart: 0,
+        trimEnd: videoAsset.duration,
+      },
+      videoAsset.duration
+    );
+
+    return {
+      image: videoAsset.posterCanvas,
+      baseName: stripExtension(file.name),
+      originalBytes: file.size,
+      width: videoAsset.nativeWidth,
+      height: videoAsset.nativeHeight,
+      thumbDataUrl: videoAsset.thumbDataUrl,
+      mediaKind: 'video',
+      videoAsset,
+      videoConfig,
+    };
+  }
+
+  const lowerName = file.name.toLowerCase();
+  const isGif = file.type === 'image/gif' || lowerName.endsWith('.gif');
+  const isWebp = file.type === 'image/webp' || lowerName.endsWith('.webp');
+
+  let animatedDecoded = null;
+  if (isGif || isWebp) {
+    const decodeOpts = {
+      signal,
+      onProgress: (cur: number, tot: number) => {
+        options?.onProgress?.({
+          fraction: Math.min(0.95, cur / Math.max(1, tot)),
+          detailText: `Decodificando frame ${cur}/${tot}...`,
+        });
+      },
+    };
+    try {
+      animatedDecoded = isGif
+        ? await decodeAnimatedGif(file, decodeOpts)
+        : await decodeAnimatedWebp(file, decodeOpts);
+    } catch (err) {
+      if (isAbortError(err)) throw err;
+      animatedDecoded = null;
+    }
+  }
+
+  throwIfAborted(signal);
+
+  if (animatedDecoded && animatedDecoded.frames.length > 1) {
+    const firstCanvas = animatedDecoded.frames[0]!.canvas;
+    options?.onProgress?.({ fraction: 1 });
+    return {
+      image: firstCanvas,
+      baseName: stripExtension(file.name),
+      originalBytes: file.size,
+      width: animatedDecoded.width,
+      height: animatedDecoded.height,
+      thumbDataUrl: createThumbnailDataUrl(firstCanvas),
+      mediaKind: isWebp ? 'animated-webp' : 'gif',
+      gifFrames: animatedDecoded.frames,
+    };
+  }
+
+  options?.onProgress?.({ fraction: 0.4, detailText: 'Decodificando imagem...' });
+  const img = await loadStaticImageElement(file, signal);
+  options?.onProgress?.({ fraction: 1 });
 
   return {
     image: img,
     baseName: stripExtension(file.name),
     originalBytes: file.size,
-    width: gifDecoded ? gifDecoded.width : img.naturalWidth,
-    height: gifDecoded ? gifDecoded.height : img.naturalHeight,
+    width: img.naturalWidth,
+    height: img.naturalHeight,
     thumbDataUrl: createThumbnailDataUrl(img),
-    gifFrames: gifDecoded?.frames,
+    mediaKind: 'image',
   };
 }
 
+export const loadMediaFromFile = loadImageFromFile;
+
 /**
- * Extrai todos os arquivos de imagem presentes em um evento de Paste (Ctrl+V).
+ * Extrai todos os arquivos de mídia suportados de um evento de Paste (Ctrl+V).
  */
 export function extractImagesFromClipboard(event: ClipboardEvent): File[] {
   const items = event.clipboardData?.items;
@@ -107,16 +233,18 @@ export function extractImagesFromClipboard(event: ClipboardEvent): File[] {
   const result: File[] = [];
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    if (item && item.type.startsWith('image/')) {
+    if (item && item.kind === 'file') {
       const file = item.getAsFile();
-      if (file) result.push(file);
+      if (file && isSupportedMediaFile(file)) {
+        result.push(file);
+      }
     }
   }
   return result;
 }
 
 /**
- * Extrai todos os arquivos de imagem presentes em um evento de Drag & Drop.
+ * Extrai todos os arquivos de mídia suportados de um evento de Drag & Drop.
  */
 export function extractImagesFromDrop(event: DragEvent): File[] {
   const files = event.dataTransfer?.files;
@@ -125,7 +253,7 @@ export function extractImagesFromDrop(event: DragEvent): File[] {
   const result: File[] = [];
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
-    if (file && file.type.startsWith('image/')) {
+    if (file && isSupportedMediaFile(file)) {
       result.push(file);
     }
   }
@@ -241,10 +369,11 @@ export async function copyCanvasToClipboard(canvas: HTMLCanvasElement): Promise<
 export function triggerBlobDownload(
   blob: Blob,
   baseName: string,
-  format: ImageFormat | 'image/gif'
+  format: ImageFormat | AnimatedFormat
 ): void {
-  const formatMeta = FORMAT_OPTIONS.find((f) => f.mime === format);
-  const ext = format === 'image/gif' ? 'gif' : (formatMeta?.extension ?? 'png');
+  const staticMeta = FORMAT_OPTIONS.find((f) => f.mime === format);
+  const animMeta = ANIMATED_FORMAT_OPTIONS.find((f) => f.mime === format);
+  const ext = staticMeta?.extension ?? animMeta?.extension ?? 'png';
   const url = URL.createObjectURL(blob);
 
   const link = document.createElement('a');

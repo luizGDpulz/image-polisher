@@ -1,6 +1,10 @@
 export type ImageFormat = 'image/png' | 'image/webp' | 'image/jpeg' | 'image/avif';
 
-export type ToolId = 'shadow' | 'corners';
+export type AnimatedFormat = 'image/gif' | 'image/webp';
+
+export type MediaKind = 'image' | 'gif' | 'animated-webp' | 'video';
+
+export type ToolId = 'shadow' | 'corners' | 'video';
 
 export type PresetName = 'nenhum' | 'leve' | 'medio' | 'forte' | 'flutuante';
 
@@ -28,6 +32,29 @@ export interface ExportConfig {
   quality: number;
 }
 
+export interface AnimatedExportConfig {
+  format: AnimatedFormat;
+  dithering: boolean;
+  loop: boolean;
+}
+
+export interface VideoConfig {
+  fps: number;
+  maxWidth: number;
+  trimStart: number;
+  trimEnd: number;
+}
+
+export interface AnimationFrameChunk {
+  canvas: HTMLCanvasElement;
+  delayMs: number;
+}
+
+export interface AnimationFrameSource {
+  totalFrames: number;
+  iterateFrames: (signal?: AbortSignal) => AsyncIterable<AnimationFrameChunk>;
+}
+
 export interface FormatOption {
   mime: ImageFormat;
   label: string;
@@ -35,6 +62,50 @@ export interface FormatOption {
   supportsLossyQuality: boolean;
   supportsTransparency: boolean;
 }
+
+export interface AnimatedFormatOption {
+  mime: AnimatedFormat;
+  label: string;
+  shortLabel: string;
+  extension: string;
+  supportsLossyQuality: boolean;
+  supportsTransparency: boolean;
+}
+
+export const DEFAULT_VIDEO_FPS = 15;
+
+export const VIDEO_FPS_PRESETS = [10, 15, 20, 24, 30] as const;
+
+export const VIDEO_WIDTH_PRESETS = [
+  { value: 0, label: 'Orig.' },
+  { value: 1280, label: '1280' },
+  { value: 960, label: '960' },
+  { value: 720, label: '720' },
+  { value: 480, label: '480' },
+] as const;
+
+export const RECOMMENDED_MAX_FRAMES = 240;
+
+export const HARD_MAX_FRAMES = 600;
+
+export const ANIMATED_FORMAT_OPTIONS: readonly AnimatedFormatOption[] = [
+  {
+    mime: 'image/webp',
+    label: 'WebP Animado (16M cores / Transparente)',
+    shortLabel: 'WEBP',
+    extension: 'webp',
+    supportsLossyQuality: true,
+    supportsTransparency: true,
+  },
+  {
+    mime: 'image/gif',
+    label: 'GIF (Compatibilidade Universal)',
+    shortLabel: 'GIF',
+    extension: 'gif',
+    supportsLossyQuality: false,
+    supportsTransparency: false,
+  },
+] as const;
 
 export const FORMAT_OPTIONS: readonly FormatOption[] = [
   {

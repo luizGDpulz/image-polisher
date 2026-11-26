@@ -616,8 +616,225 @@ details:not([open])::details-content {
   opacity: 0;
 }
 
-#btn-batch-clear[hidden] {
+#btn-batch-clear[hidden],
+#btn-tool-video[hidden],
+#playback-controls-group[hidden],
+#export-progress-card[hidden],
+#static-format-section[hidden],
+#animated-format-section[hidden],
+#gif-dithering-wrapper[hidden],
+#video-frames-warning[hidden] {
   display: none;
+}
+
+#static-format-section:not([hidden]) + #animated-format-section {
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.polisher-warning-box {
+  background-color: #fff9db;
+  color: #9c5200;
+  border: 1px solid #ffe066;
+}
+
+@supports (color: light-dark(white, black)) {
+  .polisher-warning-box {
+    background-color: light-dark(#fff9db, rgba(230, 119, 0, 0.14));
+    color: light-dark(#9c5200, #ffd43b);
+    border-color: light-dark(#ffe066, rgba(255, 212, 59, 0.28));
+  }
+}
+
+/* Barra de progresso nativa (guia modern-web-guidance: progress) */
+progress.polisher-progress {
+  appearance: none;
+  border: 0 solid;
+  overflow: clip;
+  border-radius: 999px;
+  background: var(--border-color);
+  container-type: inline-size;
+  --progress-bar-indeterminate-size: 32%;
+  --progress-bar-indeterminate-animation-duration: 1.5s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  progress.polisher-progress {
+    --progress-bar-indeterminate-animation-duration: 10s;
+  }
+}
+
+progress.polisher-progress::-webkit-progress-bar {
+  background: transparent;
+}
+
+progress.polisher-progress::-webkit-progress-value {
+  background: var(--color-brand);
+  border-radius: 999px;
+  transition: inline-size 0.15s ease-out;
+}
+
+progress.polisher-progress::-moz-progress-bar {
+  background: var(--color-brand);
+  border-radius: 999px;
+  transition: inline-size 0.15s ease-out;
+}
+
+progress.polisher-progress:indeterminate::-webkit-progress-value {
+  animation: progress-bar-indeterminate var(--progress-bar-indeterminate-animation-duration) infinite linear;
+}
+
+progress.polisher-progress:indeterminate::-moz-progress-bar {
+  animation: progress-bar-indeterminate var(--progress-bar-indeterminate-animation-duration) infinite linear;
+}
+
+@keyframes progress-bar-indeterminate {
+  from,
+  to {
+    inline-size: var(--progress-bar-indeterminate-size);
+    margin-right: auto;
+  }
+  from {
+    translate: -100%;
+  }
+  to {
+    translate: 100cqi;
+  }
+}
+
+/* Modal de carregamento nativo (<dialog>) (guia modern-web-guidance: dialog) */
+dialog.polisher-loading-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+dialog.polisher-loading-dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog.polisher-loading-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(3px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+/* Spinner nativo baseado em <progress> indeterminado (guia modern-web-guidance: spinner) */
+@property --arc-start {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --arc-end {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --progress-dash-animation {
+  syntax: "*";
+  inherits: false;
+  initial-value: , progress-dash 2.4s ease-in-out infinite;
+}
+
+progress.loading-spinner:indeterminate::-webkit-progress-bar {
+  display: none;
+  background: none;
+}
+
+progress.loading-spinner:indeterminate::-webkit-progress-value {
+  display: none;
+  background: none;
+}
+
+progress.loading-spinner:indeterminate::-moz-progress-bar {
+  display: none;
+  background: none;
+}
+
+progress.loading-spinner:indeterminate::slider-fill {
+  display: none;
+  background: none;
+}
+
+progress.loading-spinner:indeterminate {
+  --_from: calc(90deg + var(--arc-start, 0deg));
+  --_to: calc(90deg + var(--arc-end, 158deg));
+  --size: 30px;
+  --thickness: 2.5px;
+  --spinner-color: var(--color-brand);
+  --track-color: var(--border-color);
+  --spinner-duration: 1.2s;
+  --_used-spinner-duration: var(--spinner-duration);
+
+  position: relative;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  appearance: none;
+  background: conic-gradient(
+      from var(--_from),
+      var(--spinner-color) calc(var(--_to) - var(--_from)),
+      transparent 0
+    )
+    var(--track-color);
+
+  @supports (background-clip: border-area) {
+    background-clip: border-area;
+    border: var(--thickness) solid transparent;
+    background-origin: border-box;
+  }
+
+  @supports not (background-clip: border-area) {
+    --clip-boundary: calc(100% - var(--thickness));
+    mask-image: radial-gradient(
+      farthest-side,
+      transparent var(--clip-boundary),
+      black var(--clip-boundary)
+    );
+    border: 0;
+  }
+
+  @media (forced-colors: active) {
+    forced-color-adjust: none;
+    --spinner-color: CanvasText;
+    --track-color: Canvas;
+  }
+
+  animation:
+    progress-spin var(--_used-spinner-duration) linear infinite
+    var(--progress-dash-animation, );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  progress.loading-spinner:indeterminate {
+    --_used-spinner-duration: 6s;
+    --progress-dash-animation: ;
+    --arc-end: 158deg;
+  }
+}
+
+@keyframes progress-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+
+@keyframes progress-dash {
+  from {
+    --arc-start: 0deg;
+    --arc-end: 20deg;
+  }
+  50% {
+    --arc-start: 100deg;
+    --arc-end: 340deg;
+  }
+  to {
+    --arc-start: 360deg;
+    --arc-end: 380deg;
+  }
 }
 
 .batch-scroller {
@@ -625,6 +842,7 @@ details:not([open])::details-content {
   --fade-dir: right;
   --fade-start-pos: 0;
   --fade-end-pos: 100%;
+  contain: layout style;
   scroll-padding-inline: var(--fade-size);
   mask:
     linear-gradient(black, black) no-clip subtract,
