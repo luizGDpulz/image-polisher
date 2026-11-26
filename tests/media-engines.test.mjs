@@ -447,7 +447,7 @@ describe('Motor de Vídeo', () => {
   });
 });
 
-describe('Gatekeeper de Estilo (mind-light-style & progress)', () => {
+describe('Gatekeeper de Estilo (mind-light-style, dialog & progress)', () => {
   it('não utiliza cores ou classes banidas nos arquivos do projeto', () => {
     const filesToCheck = [
       'src/pages/index.astro',
@@ -455,6 +455,7 @@ describe('Gatekeeper de Estilo (mind-light-style & progress)', () => {
       'src/scripts/polisher-client.ts',
       'src/lib/types.ts',
       'src/lib/gif-engine.ts',
+      'src/lib/gif-decode.worker.ts',
       'src/lib/webp-engine.ts',
       'src/lib/video-engine.ts',
       'src/lib/image-io.ts',
@@ -485,5 +486,25 @@ describe('Gatekeeper de Estilo (mind-light-style & progress)', () => {
         `Regra CSS agrupa pseudo-elementos de fornecedores distintos: ${header.trim()}`
       );
     }
+  });
+
+  it('usa <dialog> nativo de carregamento sem atributos redundantes nem display incondicional', () => {
+    const html = fs.readFileSync(path.join(rootDir, 'src/pages/index.astro'), 'utf8');
+    const dialogMatch = html.match(/<dialog\b[^>]*id="import-loading-dialog"[^>]*>/);
+    assert.ok(dialogMatch, 'Modal nativo #import-loading-dialog não encontrado em index.astro');
+    assert.equal(dialogMatch[0].includes('role="dialog"'), false);
+    assert.equal(dialogMatch[0].includes('aria-modal'), false);
+    assert.ok(html.includes('class="loading-spinner'));
+
+    const css = fs.readFileSync(path.join(rootDir, 'src/styles/global.css'), 'utf8');
+    const bareDialogRules = css.match(/(?:^|\n)\s*dialog(?:\.polisher-loading-dialog)?\s*\{[^}]*\}/g) ?? [];
+    for (const rule of bareDialogRules) {
+      assert.equal(
+        /\bdisplay\s*:/.test(rule),
+        false,
+        `Regra de <dialog> define display incondicionalmente sem [open]: ${rule}`
+      );
+    }
+    assert.match(css, /dialog\.polisher-loading-dialog\[open\]\s*\{[^}]*\bdisplay\s*:\s*flex/);
   });
 });

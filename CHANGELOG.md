@@ -11,9 +11,11 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - **Suporte a vídeos (`MP4`, `WebM`, `MOV`, etc.):** importação por seleção, Drag & Drop e Paste com preview ao vivo no palco aplicando bordas arredondadas e sombra em tempo real, painel dedicado `Vídeo` para taxa de quadros (`10–30 fps`), largura máxima proporcional, recorte de trecho (início/fim), controles de Play/Pause no palco e exportação por streaming de frames (#16).
 - **Exportação e decodificação em WebP Animado (RFC 9649):** muxer RIFF client-side com 16,7 milhões de cores, loop configurável (`Loop infinito` / `1 vez`), controle de qualidade e canal alfa de 8 bits preservando sombras suaves e cantos arredondados sobre fundo transparente (#18).
 - **Barra de progresso cancelável (`<progress>`):** acompanhamento frame a frame durante codificações animadas e exportações em lote com botão `Cancelar` via `AbortController` (#16, #17, #18).
+- **Modal de carregamento em lote (`<dialog>` + Web Worker):** bloqueio visual com spinner nativo (`<progress class="loading-spinner">`), progresso contínuo e botão `Cancelar` durante importação sequencial de múltiplos arquivos e mídias pesadas (#21).
 
 ### Alterado
 - **Qualidade de GIF animado:** adicionado dithering Floyd-Steinberg com cache RGB565 (seleção `Alta` / `Rápida` no popover de saída), streaming via `AnimationFrameSource`, opção de repetição (`Loop infinito` / `1 vez`) e cedência cooperativa à thread principal (`scheduler.yield()`) (#17).
+- **Performance na importação de arquivos:** decodificação LZW de GIFs movida para Web Worker dedicado (`gif-decode.worker.ts`) com transferência zero-copy, eliminação de decodificação dupla em GIF/WebP animado e otimização de Drag & Drop por contador único (#21).
 
 ## [1.2.0] - 2026-11-24
 
