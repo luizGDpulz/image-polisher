@@ -368,11 +368,22 @@ interface ImageDecoderConstructorLike {
   isTypeSupported(type: string): Promise<boolean>;
 }
 
+export interface DecodeWebpOptions {
+  onProgress?: (current: number, total: number) => void;
+  signal?: AbortSignal;
+}
+
 /**
- * Decodifica um arquivo WebP animado usando a API nativa `ImageDecoder`.
+ * Decodifica um arquivo WebP animado usando a API nativa `ImageDecoder`
+ * com cedência cooperativa à thread principal, progresso e suporte a cancelamento.
  * Retorna `null` se for estático ou se o navegador não suportar `ImageDecoder`.
  */
-export async function decodeAnimatedWebp(file: File): Promise<DecodedGifResult | null> {
+export async function decodeAnimatedWebp(
+  file: File,
+  options?: DecodeWebpOptions
+): Promise<DecodedGifResult | null> {
+  throwIfAborted(options?.signal);
+
   const DecoderCtor = (globalThis as { ImageDecoder?: ImageDecoderConstructorLike }).ImageDecoder;
   if (!DecoderCtor || typeof DecoderCtor.isTypeSupported !== 'function') {
     return null;
@@ -384,10 +395,14 @@ export async function decodeAnimatedWebp(file: File): Promise<DecodedGifResult |
   }
 
   const buffer = await file.arrayBuffer();
+  throwIfAborted(options?.signal);
+
   const decoder = new DecoderCtor({ data: buffer, type: 'image/webp' });
 
   try {
     await decoder.tracks.ready;
+    throwIfAborted(options?.signal);
+
     const total = decoder.tracks.selectedTrack?.frameCount ?? 0;
     if (total <= 1) {
       return null;
@@ -397,8 +412,11 @@ export async function decodeAnimatedWebp(file: File): Promise<DecodedGifResult |
     const frames: DecodedGifFrame[] = [];
     let outWidth = 0;
     let outHeight = 0;
+    let lastYield = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
     for (let i = 0; i < limit; i++) {
+      throwIfAborted(options?.signal);
+
       const decoded = await decoder.decode({ frameIndex: i });
       const vf = decoded.image;
 
@@ -421,6 +439,14 @@ export async function decodeAnimatedWebp(file: File): Promise<DecodedGifResult |
         frames.push({ canvas: frameCanvas, delayMs });
       } finally {
         vf.close();
+      }
+
+      options?.onProgress?.(i + 1, limit);
+
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      if (now - lastYield >= 12) {
+        await yieldToMain();
+        lastYield = typeof performance !== 'undefined' ? performance.now() : Date.now();
       }
     }
 

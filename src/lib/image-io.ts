@@ -20,6 +20,12 @@ import {
   type LoadedVideoAsset,
 } from './video-engine';
 import { decodeAnimatedWebp } from './webp-engine';
+import { throwIfAborted } from './yield-main';
+
+export interface LoadMediaOptions {
+  signal?: AbortSignal;
+  onProgress?: (info: { fraction: number; detailText?: string }) => void;
+}
 
 export interface LoadedImageResult {
   image: HTMLImageElement | HTMLCanvasElement;
@@ -70,13 +76,71 @@ export function stripExtension(fileName: string): string {
   return raw === 'image' ? 'print-capturado' : raw;
 }
 
+function loadStaticImageElement(file: File, signal?: AbortSignal): Promise<HTMLImageElement> {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    throwIfAborted(signal);
+
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    let settled = false;
+
+    const cleanup = () => {
+      img.onload = null;
+      img.onerror = null;
+      signal?.removeEventListener('abort', onAbort);
+    };
+
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      img.src = '';
+      URL.revokeObjectURL(objectUrl);
+      reject(new DOMException('Importação cancelada pelo usuário.', 'AbortError'));
+    };
+
+    img.onload = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      URL.revokeObjectURL(objectUrl);
+      resolve(img);
+    };
+
+    img.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Não foi possível decodificar a imagem selecionada.'));
+    };
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+    img.src = objectUrl;
+  });
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'AbortError';
+}
+
 /**
  * Carrega uma mídia suportada (imagem estática, GIF animado, WebP animado ou vídeo)
- * preparando frames decodificados ou asset de vídeo para preview e exportação.
+ * preparando frames decodificados ou asset de vídeo para preview e exportação sem
+ * decodificação dupla.
  */
-export async function loadImageFromFile(file: File): Promise<LoadedImageResult> {
+export async function loadImageFromFile(
+  file: File,
+  options?: LoadMediaOptions
+): Promise<LoadedImageResult> {
+  const signal = options?.signal;
+  throwIfAborted(signal);
+
   if (isVideoFile(file)) {
-    const videoAsset = await loadVideoAsset(file);
+    options?.onProgress?.({ fraction: 0.15, detailText: 'Carregando vídeo...' });
+    const videoAsset = await loadVideoAsset(file, signal);
+    options?.onProgress?.({ fraction: 1 });
+
     const videoConfig = sanitizeVideoConfig(
       {
         fps: DEFAULT_VIDEO_FPS,
@@ -104,42 +168,56 @@ export async function loadImageFromFile(file: File): Promise<LoadedImageResult> 
   const isGif = file.type === 'image/gif' || lowerName.endsWith('.gif');
   const isWebp = file.type === 'image/webp' || lowerName.endsWith('.webp');
 
-  const animatedPromise = isGif
-    ? decodeAnimatedGif(file).catch(() => null)
-    : isWebp
-      ? decodeAnimatedWebp(file).catch(() => null)
-      : Promise.resolve(null);
-
-  const imgPromise = new Promise<HTMLImageElement>((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const img = new Image();
-
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve(img);
+  let animatedDecoded = null;
+  if (isGif || isWebp) {
+    const decodeOpts = {
+      signal,
+      onProgress: (cur: number, tot: number) => {
+        options?.onProgress?.({
+          fraction: Math.min(0.95, cur / Math.max(1, tot)),
+          detailText: `Decodificando frame ${cur}/${tot}...`,
+        });
+      },
     };
+    try {
+      animatedDecoded = isGif
+        ? await decodeAnimatedGif(file, decodeOpts)
+        : await decodeAnimatedWebp(file, decodeOpts);
+    } catch (err) {
+      if (isAbortError(err)) throw err;
+      animatedDecoded = null;
+    }
+  }
 
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error('Não foi possível decodificar a imagem selecionada.'));
+  throwIfAborted(signal);
+
+  if (animatedDecoded && animatedDecoded.frames.length > 1) {
+    const firstCanvas = animatedDecoded.frames[0]!.canvas;
+    options?.onProgress?.({ fraction: 1 });
+    return {
+      image: firstCanvas,
+      baseName: stripExtension(file.name),
+      originalBytes: file.size,
+      width: animatedDecoded.width,
+      height: animatedDecoded.height,
+      thumbDataUrl: createThumbnailDataUrl(firstCanvas),
+      mediaKind: isWebp ? 'animated-webp' : 'gif',
+      gifFrames: animatedDecoded.frames,
     };
+  }
 
-    img.src = objectUrl;
-  });
-
-  const [img, animatedDecoded] = await Promise.all([imgPromise, animatedPromise]);
-  const isAnimated = Boolean(animatedDecoded && animatedDecoded.frames.length > 1);
-  const mediaKind: MediaKind = isAnimated ? (isWebp ? 'animated-webp' : 'gif') : 'image';
+  options?.onProgress?.({ fraction: 0.4, detailText: 'Decodificando imagem...' });
+  const img = await loadStaticImageElement(file, signal);
+  options?.onProgress?.({ fraction: 1 });
 
   return {
     image: img,
     baseName: stripExtension(file.name),
     originalBytes: file.size,
-    width: animatedDecoded ? animatedDecoded.width : img.naturalWidth,
-    height: animatedDecoded ? animatedDecoded.height : img.naturalHeight,
+    width: img.naturalWidth,
+    height: img.naturalHeight,
     thumbDataUrl: createThumbnailDataUrl(img),
-    mediaKind,
-    gifFrames: animatedDecoded?.frames,
+    mediaKind: 'image',
   };
 }
 

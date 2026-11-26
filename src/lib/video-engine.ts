@@ -295,7 +295,12 @@ export async function seekVideoToTime(
  * Carrega um arquivo de vídeo em `<video>` mudo, resolve duração real (inclusive WebM sem header)
  * e captura o frame inicial como poster e miniatura.
  */
-export async function loadVideoAsset(file: File): Promise<LoadedVideoAsset> {
+export async function loadVideoAsset(
+  file: File,
+  signal?: AbortSignal
+): Promise<LoadedVideoAsset> {
+  throwIfAborted(signal);
+
   const objectUrl = URL.createObjectURL(file);
   const video = document.createElement('video');
   video.muted = true;
@@ -304,24 +309,38 @@ export async function loadVideoAsset(file: File): Promise<LoadedVideoAsset> {
   video.src = objectUrl;
 
   try {
-    await waitForVideoLoadedData(video);
+    await waitForVideoLoadedData(video, signal);
+    throwIfAborted(signal);
 
     // Alguns arquivos WebM gravados ao vivo reportam duration === Infinity até o seek ao final
     if (!Number.isFinite(video.duration) || video.duration <= 0) {
-      await new Promise<void>((resolve) => {
-        const done = () => {
-          video.removeEventListener('timeupdate', done);
-          video.removeEventListener('seeked', done);
+      await new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const done = (err?: Error) => {
+          if (settled) return;
+          settled = true;
+          video.removeEventListener('timeupdate', onProbe);
+          video.removeEventListener('seeked', onProbe);
+          signal?.removeEventListener('abort', onAbort);
           window.clearTimeout(timer);
-          resolve();
+          if (err) reject(err);
+          else resolve();
         };
-        const timer = window.setTimeout(done, 1500);
-        video.addEventListener('timeupdate', done, { once: true });
-        video.addEventListener('seeked', done, { once: true });
+        const onProbe = () => done();
+        const onAbort = () =>
+          done(new DOMException('Importação cancelada pelo usuário.', 'AbortError'));
+        const timer = window.setTimeout(() => done(), 1500);
+        video.addEventListener('timeupdate', onProbe, { once: true });
+        video.addEventListener('seeked', onProbe, { once: true });
+        signal?.addEventListener('abort', onAbort, { once: true });
         video.currentTime = 1e7;
       });
-      await seekVideoToTime(video, 0).catch(() => undefined);
+      await seekVideoToTime(video, 0, signal).catch((err) => {
+        if (err instanceof DOMException && err.name === 'AbortError') throw err;
+      });
     }
+
+    throwIfAborted(signal);
 
     const duration =
       Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 1;
