@@ -7,6 +7,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Não lançado]
 
+## [1.3.0] - 2026-11-26
+
 ### Adicionado
 - **Suporte a vídeos (`MP4`, `WebM`, `MOV`, etc.):** importação por seleção, Drag & Drop e Paste com preview ao vivo no palco aplicando bordas arredondadas e sombra em tempo real, painel dedicado `Vídeo` para taxa de quadros (`10–30 fps`), largura máxima proporcional, recorte de trecho (início/fim), controles de Play/Pause no palco e exportação por streaming de frames (#16).
 - **Exportação e decodificação em WebP Animado (RFC 9649):** muxer RIFF client-side com 16,7 milhões de cores, loop configurável (`Loop infinito` / `1 vez`), controle de qualidade e canal alfa de 8 bits preservando sombras suaves e cantos arredondados sobre fundo transparente (#18).
@@ -53,7 +55,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Palco com viewport fixa, auto-ajuste, zoom focalizado, pan e alternância de fundo (`Grade`, `Claro`, `Escuro`).
 - Containerização multi-arch (`linux/amd64`, `linux/arm64`) publicada no GHCR.
 
-[Não lançado]: https://github.com/luizGDpulz/image-polisher/compare/v1.2.0...HEAD
+[Não lançado]: https://github.com/luizGDpulz/image-polisher/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/luizGDpulz/image-polisher/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/luizGDpulz/image-polisher/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luizGDpulz/image-polisher/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/luizGDpulz/image-polisher/releases/tag/v1.0.0
