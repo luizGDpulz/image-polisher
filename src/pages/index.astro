@@ -2200,6 +2200,58 @@ import Layout from '../layouts/Layout.astro';
       </main>
     </div>
 
+    <!-- Modal de Carregamento em Lote -->
+    <dialog
+      id="import-loading-dialog"
+      aria-labelledby="import-loading-title"
+      aria-describedby="import-loading-detail"
+      closedby="none"
+      class="polisher-loading-dialog m-auto w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-[var(--border-color)] bg-[var(--bg-panel)] text-[var(--text-main)] shadow-[0_14px_38px_rgba(0,0,0,0.16)] p-5"
+    >
+      <div class="flex items-center gap-3.5">
+        <progress aria-hidden="true" class="loading-spinner shrink-0"></progress>
+        <div class="min-w-0 flex-1">
+          <h1
+            id="import-loading-title"
+            class="text-sm font-semibold m-0 text-[var(--text-main)] truncate"
+          >
+            Carregando arquivos...
+          </h1>
+          <p
+            id="import-loading-detail"
+            class="text-xs text-[var(--text-muted)] m-0 mt-0.5 truncate"
+          >
+            Preparando mídia...
+          </p>
+        </div>
+      </div>
+
+      <progress
+        id="import-loading-progress"
+        max="100"
+        value="0"
+        aria-labelledby="import-loading-title"
+        class="polisher-progress w-full h-1.5"
+      ></progress>
+
+      <div class="flex items-center justify-between gap-2">
+        <span
+          id="import-loading-count"
+          class="text-[11px] font-mono text-[var(--text-muted)]"
+        >
+          0 / 0
+        </span>
+        <button
+          type="button"
+          id="btn-import-cancel"
+          autofocus
+          class="px-2.5 py-1 rounded-lg text-xs font-medium border border-[var(--border-color)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-red-600 hover:border-red-500/40 transition cursor-pointer"
+        >
+          Cancelar
+        </button>
+      </div>
+    </dialog>
+
     <!-- Ilha 4: Rodapé Flutuante (Status + Fila de Múltiplos Arquivos) -->
     <footer
       id="floating-footer"

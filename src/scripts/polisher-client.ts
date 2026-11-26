@@ -46,10 +46,12 @@ import {
   computeVideoExportPlan,
   createVideoFrameSource,
   disposeVideoAsset,
+  isVideoFile,
   sanitizeVideoConfig,
   seekVideoToTime,
 } from '../lib/video-engine';
 import { encodeAnimatedWebpToBlob } from '../lib/webp-engine';
+import { yieldToMain } from '../lib/yield-main';
 
 interface NumericControlPair {
   range: HTMLInputElement;
@@ -182,6 +184,17 @@ export function initImagePolisher(): void {
   const exportProgressEl = document.getElementById('export-progress') as HTMLProgressElement | null;
   const btnExportCancel = document.getElementById('btn-export-cancel') as HTMLButtonElement | null;
 
+  const importLoadingDialog = document.getElementById(
+    'import-loading-dialog'
+  ) as HTMLDialogElement | null;
+  const importLoadingTitle = document.getElementById('import-loading-title');
+  const importLoadingDetail = document.getElementById('import-loading-detail');
+  const importLoadingCount = document.getElementById('import-loading-count');
+  const importLoadingProgress = document.getElementById(
+    'import-loading-progress'
+  ) as HTMLProgressElement | null;
+  const btnImportCancel = document.getElementById('btn-import-cancel') as HTMLButtonElement | null;
+
   const btnReset = document.getElementById('btn-reset') as HTMLButtonElement | null;
   const btnCopy = document.getElementById('btn-copy') as HTMLButtonElement | null;
   const btnDownload = document.getElementById('btn-download') as HTMLButtonElement | null;
@@ -236,6 +249,7 @@ export function initImagePolisher(): void {
   let queue: QueueItem[] = [];
   let activeIndex = -1;
   let isBatchExporting = false;
+  let isImporting = false;
   let estimateTimer: number | null = null;
   let gifTimer: number | null = null;
   let videoRafId: number | null = null;
@@ -247,6 +261,7 @@ export function initImagePolisher(): void {
   let supportsWebpEncoding = true;
   let hasUserChosenAnimatedFormat = false;
   let exportAbortController: AbortController | null = null;
+  let importAbortController: AbortController | null = null;
 
   function getActiveItem(): QueueItem | null {
     if (activeIndex < 0 || activeIndex >= queue.length) return null;
@@ -943,6 +958,8 @@ export function initImagePolisher(): void {
       const thumb = document.createElement('img');
       thumb.src = item.thumbDataUrl;
       thumb.alt = '';
+      thumb.decoding = 'async';
+      thumb.loading = 'lazy';
       thumb.className =
         'w-6 h-6 rounded object-cover shrink-0 border border-[var(--border-color)] bg-[var(--bg-panel)]';
 
@@ -1215,49 +1232,205 @@ export function initImagePolisher(): void {
     }
   }
 
+  function waitForNextPaint(): Promise<void> {
+    return new Promise((resolve) => {
+      window.requestAnimationFrame(() => {
+        void yieldToMain().then(resolve);
+      });
+    });
+  }
+
+  function updateImportLoadingModal(
+    title: string,
+    detail: string,
+    countText: string,
+    percent: number
+  ): void {
+    if (importLoadingTitle) importLoadingTitle.textContent = title;
+    if (importLoadingDetail) importLoadingDetail.textContent = detail;
+    if (importLoadingCount) importLoadingCount.textContent = countText;
+    if (importLoadingProgress) {
+      importLoadingProgress.max = 100;
+      importLoadingProgress.value = Math.min(100, Math.max(0, percent));
+    }
+  }
+
+  function openImportLoadingModal(): void {
+    if (!importLoadingDialog) return;
+    if (btnImportCancel) btnImportCancel.disabled = false;
+    if (!importLoadingDialog.open) {
+      importLoadingDialog.showModal();
+    }
+  }
+
+  function closeImportLoadingModal(): void {
+    if (importLoadingDialog?.open) {
+      importLoadingDialog.close();
+    }
+    if (btnImportCancel) btnImportCancel.disabled = false;
+  }
+
+  function requestImportCancel(): void {
+    if (!importAbortController || importAbortController.signal.aborted) return;
+    if (btnImportCancel) btnImportCancel.disabled = true;
+    if (importLoadingDetail) importLoadingDetail.textContent = 'Cancelando carregamento...';
+    importAbortController.abort();
+  }
+
+  btnImportCancel?.addEventListener('click', requestImportCancel);
+  importLoadingDialog?.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    requestImportCancel();
+  });
+
   async function handleFilesSelection(
     files: File[],
     options?: { append?: boolean; sourceLabel?: string }
   ): Promise<void> {
-    if (files.length === 0) return;
+    if (files.length === 0 || isImporting || isBatchExporting) return;
 
-    const results = await Promise.allSettled(files.map((file) => loadImageFromFile(file)));
-    const loaded: QueueItem[] = [];
+    isImporting = true;
+    const wasPaused = isPlaybackPaused;
+    stopAllPlayback();
 
-    for (const res of results) {
-      if (res.status === 'fulfilled') {
-        const id =
-          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-            ? crypto.randomUUID()
-            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        loaded.push({ ...res.value, id });
-      }
-    }
+    const controller = new AbortController();
+    importAbortController = controller;
+    const signal = controller.signal;
 
-    if (loaded.length === 0) {
-      showToast('Não foi possível abrir nenhum dos arquivos selecionados');
-      return;
-    }
+    const shouldShowImmediate =
+      files.length > 1 ||
+      files.some((file) => {
+        const lower = file.name.toLowerCase();
+        return (
+          isVideoFile(file) ||
+          file.type === 'image/gif' ||
+          file.type === 'image/webp' ||
+          lower.endsWith('.gif') ||
+          lower.endsWith('.webp') ||
+          file.size > 1_500_000
+        );
+      });
 
-    const failedCount = files.length - loaded.length;
+    updateImportLoadingModal(
+      files.length > 1 ? `Carregando ${files.length} arquivos...` : 'Carregando arquivo...',
+      'Preparando mídia...',
+      `0 / ${files.length}`,
+      0
+    );
 
-    if (options?.append && queue.length > 0) {
-      const firstNewIndex = queue.length;
-      queue = [...queue, ...loaded];
-      selectQueueIndex(firstNewIndex);
+    let modalTimer: number | null = null;
+    if (shouldShowImmediate) {
+      openImportLoadingModal();
+      await waitForNextPaint();
     } else {
-      for (const oldItem of queue) {
-        disposeQueueItem(oldItem);
-      }
-      queue = loaded;
-      selectQueueIndex(0);
+      modalTimer = window.setTimeout(() => {
+        if (isImporting && !signal.aborted) {
+          openImportLoadingModal();
+        }
+      }, 120);
     }
 
-    if (loaded.length > 1) {
-      const suffix = failedCount > 0 ? ` (${failedCount} falhou)` : '';
-      showToast(`${loaded.length} arquivos carregados${suffix}`);
-    } else if (options?.sourceLabel) {
-      showToast(options.sourceLabel);
+    const loaded: QueueItem[] = [];
+    let failedCount = 0;
+    let cancelled = false;
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        if (signal.aborted) {
+          cancelled = true;
+          break;
+        }
+
+        const file = files[i]!;
+        const titleText =
+          files.length > 1
+            ? `Carregando arquivo ${i + 1} de ${files.length}`
+            : 'Carregando arquivo...';
+        updateImportLoadingModal(
+          titleText,
+          file.name,
+          `${i + 1} / ${files.length}`,
+          (i / files.length) * 100
+        );
+
+        try {
+          const media = await loadImageFromFile(file, {
+            signal,
+            onProgress: ({ fraction, detailText }) => {
+              const pct = ((i + Math.min(1, Math.max(0, fraction))) / files.length) * 100;
+              updateImportLoadingModal(
+                titleText,
+                detailText ? `${file.name} — ${detailText}` : file.name,
+                `${i + 1} / ${files.length}`,
+                pct
+              );
+            },
+          });
+
+          const id =
+            typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+          loaded.push({ ...media, id });
+        } catch (err) {
+          if (err instanceof DOMException && err.name === 'AbortError') {
+            cancelled = true;
+            break;
+          }
+          failedCount++;
+        }
+
+        await yieldToMain();
+      }
+
+      if (cancelled || signal.aborted) {
+        for (const item of loaded) {
+          disposeQueueItem(item);
+        }
+        showToast('Carregamento cancelado');
+        return;
+      }
+
+      if (loaded.length === 0) {
+        showToast('Não foi possível abrir nenhum dos arquivos selecionados');
+        return;
+      }
+
+      updateImportLoadingModal(
+        'Preparando visualização...',
+        loaded[0]!.baseName,
+        `${files.length} / ${files.length}`,
+        100
+      );
+
+      if (options?.append && queue.length > 0) {
+        const firstNewIndex = queue.length;
+        queue = [...queue, ...loaded];
+        selectQueueIndex(firstNewIndex);
+      } else {
+        for (const oldItem of queue) {
+          disposeQueueItem(oldItem);
+        }
+        queue = loaded;
+        selectQueueIndex(0);
+      }
+
+      if (loaded.length > 1) {
+        const suffix = failedCount > 0 ? ` (${failedCount} falhou)` : '';
+        showToast(`${loaded.length} arquivos carregados${suffix}`);
+      } else if (options?.sourceLabel) {
+        showToast(options.sourceLabel);
+      }
+    } finally {
+      if (modalTimer !== null) {
+        window.clearTimeout(modalTimer);
+      }
+      closeImportLoadingModal();
+      importAbortController = null;
+      isImporting = false;
+      if (cancelled && !wasPaused && isAnimatedQueueItem(getActiveItem())) {
+        startPlaybackIfNeeded();
+      }
     }
   }
 
@@ -1832,7 +2005,7 @@ export function initImagePolisher(): void {
     { passive: false }
   );
 
-  // Drag & Drop na página inteira e no dropzone
+  // Drag & Drop fluido por contador único (evita mutações de DOM a cada pixel em dragover)
   const setDropHighlight = (active: boolean) => {
     const targets = [dropzoneLabel, stageWrapper].filter(Boolean) as HTMLElement[];
     targets.forEach((el) => {
@@ -1841,19 +2014,36 @@ export function initImagePolisher(): void {
     });
   };
 
-  const dragTargets = [document.body, dropzoneLabel, stageWrapper].filter(Boolean) as HTMLElement[];
-  dragTargets.forEach((target) => {
-    target.addEventListener('dragover', (e) => {
-      e.preventDefault();
+  let dragDepth = 0;
+
+  window.addEventListener('dragenter', (e) => {
+    if (!e.dataTransfer?.types.includes('Files')) return;
+    e.preventDefault();
+    dragDepth++;
+    if (dragDepth === 1) {
       setDropHighlight(true);
-    });
-    target.addEventListener('dragleave', () => {
+    }
+  });
+
+  window.addEventListener('dragover', (e) => {
+    if (!e.dataTransfer?.types.includes('Files')) return;
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  });
+
+  window.addEventListener('dragleave', () => {
+    if (dragDepth <= 0) return;
+    dragDepth--;
+    if (dragDepth === 0) {
       setDropHighlight(false);
-    });
+    }
   });
 
   window.addEventListener('drop', (e) => {
     e.preventDefault();
+    dragDepth = 0;
     setDropHighlight(false);
     const files = extractImagesFromDrop(e);
     if (files.length > 0) {
